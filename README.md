@@ -30,6 +30,8 @@ Tag features aren't in yet. This is interactions and maps only.
 - **Playing together:** gorillas whose Minecraft is on the same server share the world. They
   line up in Gorilla Tag too, because the map is anchored at the Minecraft world's spawn point.
 
+**Windows players: follow the [step-by-step Windows guide](docs/WINDOWS-GUIDE.md).** Downloads are on the [releases page](https://github.com/easyax2/gorillacraft/releases).
+
 ## Requirements
 
 - Gorilla Tag (Steam/PC VR) with **BepInEx 5** and **Utilla**. GorillaCraft is only active in
