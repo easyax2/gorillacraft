@@ -1,109 +1,178 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Rendering.Universal;
 
 namespace GorillaCraft
 {
     /// <summary>
-    /// Shows Minecraft's own picture of the world in Gorilla Tag. Each frame comes with a grid of
-    /// 3D points (where each part of the picture is), so the picture is stretched over a mesh of
-    /// those points: a world-fixed 3D surface rather than a flat screen. Both eyes see it with
-    /// correct depth, turning your head is smooth even though Minecraft's frames arrive a little
-    /// later, and gorillas and hands sort against it properly.
+    /// Shows Minecraft's own picture of the world in Gorilla Tag, one per eye. Minecraft draws
+    /// alternately from your left and right eye; each picture comes with a grid of 3D points
+    /// (where each part of it is), and is stretched over a mesh of those points: a world-fixed 3D
+    /// surface, so turning your head stays smooth between Minecraft's frames.
     ///
-    /// Every cell of the grid is drawn, edges included: seen from where Minecraft drew the frame,
-    /// the surface shows exactly Minecraft's pixels, whatever its depth. Leaving cells out made
-    /// holes where Gorilla Tag's own sky showed through.
+    /// Each eye only ever sees its own picture: a render pass draws the left surface while Unity
+    /// renders the left eye and the right one for the right eye. That needs Gorilla Tag to render
+    /// the eyes one after the other (multi-pass), which the plugin sets before VR starts. If the
+    /// eyes are rendered together anyway (single-pass), or in the desktop view, one picture is
+    /// used for both.
+    ///
+    /// Every cell of the grid is drawn: seen from where Minecraft drew it, the surface shows
+    /// exactly Minecraft's pixels.
     /// </summary>
     public sealed class OverlayView
     {
-        private readonly GameObject go;
-        private readonly Mesh mesh;
-        private readonly Material material;
-        private Texture2D texture;
-        private Vector3[] vertices = new Vector3[0];
-        private Vector2[] uvs = new Vector2[0];
-        private readonly List<int> triangles = new List<int>();
-        private int gridW, gridH;
+        private sealed class Surface
+        {
+            public Mesh Mesh;
+            public Material Material;
+            public Texture2D Texture;
+            public Vector3[] Vertices = new Vector3[0];
+            public readonly List<int> Triangles = new List<int>();
+            public int GridW, GridH;
+            public Matrix4x4 LocalToWorld = Matrix4x4.identity;
+            public bool HasFrame;
+        }
+
+        private readonly Surface[] surfaces = new Surface[3]; // left, right, centre
+        private readonly EyePass pass;
+        public bool Visible { get; set; }
+
+        /// <summary>Whether the last frame was drawn per eye (the render pass saw separate eye passes).</summary>
+        public bool PerEyeSeen => pass.SawMultiPass;
 
         public OverlayView(Shader shader)
         {
-            go = new GameObject("GorillaCraft Minecraft view");
-            Object.DontDestroyOnLoad(go);
-            mesh = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
-            mesh.MarkDynamic();
-            go.AddComponent<MeshFilter>().sharedMesh = mesh;
-            var mr = go.AddComponent<MeshRenderer>();
-            material = MinecraftWorld.MakeMaterial(shader, 0, Texture2D.blackTexture);
-            if (material.HasProperty("_Cull"))
-                material.SetFloat("_Cull", 0f);
-            mr.sharedMaterial = material;
-            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            mr.receiveShadows = false;
-            GorillaOnlyView.Assign(go);
-            go.SetActive(false);
+            for (int i = 0; i < 3; i++)
+            {
+                var m = MinecraftWorld.MakeMaterial(shader, 0, Texture2D.blackTexture);
+                if (m.HasProperty("_Cull"))
+                    m.SetFloat("_Cull", 0f);
+                var mesh = new Mesh { indexFormat = IndexFormat.UInt32 };
+                mesh.MarkDynamic();
+                surfaces[i] = new Surface { Mesh = mesh, Material = m };
+            }
+            pass = new EyePass(this) { renderPassEvent = RenderPassEvent.AfterRenderingOpaques };
+            RenderPipelineManager.beginCameraRendering += OnBeginCamera;
         }
 
-        public bool Visible
+        private void OnBeginCamera(ScriptableRenderContext context, Camera camera)
         {
-            get => go.activeSelf;
-            set => go.SetActive(value);
+            if (!Visible || camera.cameraType != CameraType.Game)
+                return;
+            if (camera.targetTexture != null && !camera.stereoEnabled)
+                return; // mirrors and screens in Gorilla Tag
+            var data = camera.GetUniversalAdditionalCameraData();
+            data?.scriptableRenderer?.EnqueuePass(pass);
         }
 
         public void Show(Messages.Frame f, Coords coords)
         {
-            if (texture == null || texture.width != f.Width || texture.height != f.Height)
+            int eye = Mathf.Clamp(f.Eye, 0, 2);
+            Surface s = surfaces[eye];
+            if (s.Texture == null || s.Texture.width != f.Width || s.Texture.height != f.Height)
             {
-                if (texture != null)
-                    Object.Destroy(texture);
-                texture = new Texture2D(f.Width, f.Height, TextureFormat.RGB24, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
-                material.mainTexture = texture;
-                if (material.HasProperty("_BaseMap"))
-                    material.SetTexture("_BaseMap", texture);
+                if (s.Texture != null)
+                    Object.Destroy(s.Texture);
+                s.Texture = new Texture2D(f.Width, f.Height, TextureFormat.RGB24, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+                s.Material.mainTexture = s.Texture;
+                if (s.Material.HasProperty("_BaseMap"))
+                    s.Material.SetTexture("_BaseMap", s.Texture);
             }
-            texture.LoadRawTextureData(f.Rgb);
-            texture.Apply(false);
+            s.Texture.LoadRawTextureData(f.Rgb);
+            s.Texture.Apply(false);
 
             int n = f.GridW * f.GridH;
-            if (f.GridW != gridW || f.GridH != gridH)
+            if (f.GridW != s.GridW || f.GridH != s.GridH)
             {
-                gridW = f.GridW;
-                gridH = f.GridH;
-                vertices = new Vector3[n];
-                uvs = new Vector2[n];
+                s.GridW = f.GridW;
+                s.GridH = f.GridH;
+                s.Vertices = new Vector3[n];
+                var uvs = new Vector2[n];
                 // The picture's first row is the top; Unity loads the first row at v = 0.
-                for (int y = 0; y < gridH; y++)
-                    for (int x = 0; x < gridW; x++)
-                        uvs[y * gridW + x] = new Vector2(x / (gridW - 1f), y / (gridH - 1f));
-                mesh.Clear();
-            }
-
-            // Points are relative to the camera, so the mesh sits at the camera and floats stay small.
-            go.transform.position = coords.ToUnity(f.CamX, f.CamY, f.CamZ);
-            go.transform.localScale = Vector3.one * coords.Scale;
-            for (int i = 0; i < n; i++)
-            {
-                float x = f.Points[i * 3], y = f.Points[i * 3 + 1], z = f.Points[i * 3 + 2];
-                vertices[i] = new Vector3(x, y, -z); // Minecraft → Unity: flip Z
-            }
-
-            if (triangles.Count != (gridW - 1) * (gridH - 1) * 6)
-            {
-                triangles.Clear();
-                for (int y = 0; y < gridH - 1; y++)
+                for (int y = 0; y < s.GridH; y++)
+                    for (int x = 0; x < s.GridW; x++)
+                        uvs[y * s.GridW + x] = new Vector2(x / (s.GridW - 1f), y / (s.GridH - 1f));
+                s.Triangles.Clear();
+                for (int y = 0; y < s.GridH - 1; y++)
                 {
-                    for (int x = 0; x < gridW - 1; x++)
+                    for (int x = 0; x < s.GridW - 1; x++)
                     {
-                        int a = y * gridW + x, b = a + 1, c = a + gridW, d = c + 1;
-                        triangles.Add(a); triangles.Add(b); triangles.Add(c);
-                        triangles.Add(b); triangles.Add(d); triangles.Add(c);
+                        int a = y * s.GridW + x, b = a + 1, c = a + s.GridW, d = c + 1;
+                        s.Triangles.Add(a); s.Triangles.Add(b); s.Triangles.Add(c);
+                        s.Triangles.Add(b); s.Triangles.Add(d); s.Triangles.Add(c);
                     }
                 }
-                mesh.SetVertices(vertices);
-                mesh.SetUVs(0, uvs);
-                mesh.SetTriangles(triangles, 0, false);
+                s.Mesh.Clear();
+                s.Mesh.vertices = s.Vertices;
+                s.Mesh.uv = uvs;
+                s.Mesh.SetTriangles(s.Triangles, 0, false);
             }
-            mesh.SetVertices(vertices);
-            mesh.RecalculateBounds();
+
+            // Points are relative to the camera Minecraft drew from, so floats stay small.
+            for (int i = 0; i < n; i++)
+                s.Vertices[i] = new Vector3(f.Points[i * 3], f.Points[i * 3 + 1], -f.Points[i * 3 + 2]); // flip Z
+            s.Mesh.vertices = s.Vertices;
+            s.Mesh.RecalculateBounds();
+            s.LocalToWorld = Matrix4x4.TRS(coords.ToUnity(f.CamX, f.CamY, f.CamZ), Quaternion.identity, Vector3.one * coords.Scale);
+            s.HasFrame = true;
+        }
+
+        /// <summary>The surface for one eye (0 left, 1 right), or the best stand-in when that one has no picture yet.</summary>
+        private Surface For(int eye)
+        {
+            if (eye >= 0 && eye < 2 && surfaces[eye].HasFrame)
+                return surfaces[eye];
+            if (surfaces[2].HasFrame)
+                return surfaces[2];
+            if (surfaces[0].HasFrame)
+                return surfaces[0];
+            return surfaces[1].HasFrame ? surfaces[1] : null;
+        }
+
+        /// <summary>Draws the right eye's picture for the eye Unity is rendering right now.</summary>
+        private sealed class EyePass : ScriptableRenderPass
+        {
+            private readonly OverlayView view;
+            public bool SawMultiPass;
+
+            private sealed class PassData
+            {
+                public Mesh Mesh;
+                public Material Material;
+                public Matrix4x4 Matrix;
+            }
+
+            public EyePass(OverlayView view)
+            {
+                this.view = view;
+            }
+
+            public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
+            {
+                var cameraData = frameData.Get<UniversalCameraData>();
+                var resources = frameData.Get<UniversalResourceData>();
+                int eye = -1;
+                if (cameraData.xr != null && cameraData.xr.enabled && !cameraData.xr.singlePassEnabled)
+                {
+                    eye = cameraData.xr.multipassId;
+                    SawMultiPass = true;
+                }
+                Surface s = view.For(eye);
+                if (s == null)
+                    return;
+                using (var builder = renderGraph.AddRasterRenderPass<PassData>("GorillaCraft Minecraft view", out var data))
+                {
+                    data.Mesh = s.Mesh;
+                    data.Material = s.Material;
+                    data.Matrix = s.LocalToWorld;
+                    builder.SetRenderAttachment(resources.activeColorTexture, 0, AccessFlags.Write);
+                    builder.SetRenderAttachmentDepth(resources.activeDepthTexture, AccessFlags.ReadWrite);
+                    builder.AllowPassCulling(false);
+                    builder.SetRenderFunc((PassData d, RasterGraphContext ctx) => ctx.cmd.DrawMesh(d.Mesh, d.Matrix, d.Material, 0, 0));
+                }
+            }
         }
     }
 }

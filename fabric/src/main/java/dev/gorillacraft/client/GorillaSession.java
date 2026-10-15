@@ -54,6 +54,10 @@ public final class GorillaSession {
 	private boolean havePose;
 	private int poseAck;
 	private double poseX, poseY, poseZ;
+	/** Eye positions (Minecraft coordinates), for per-eye frames. */
+	private final double[][] eyes = new double[2][3];
+	/** Which eye the next overlay frame is drawn for. */
+	private int nextEye = Proto.EYE_LEFT;
 	private float poseYaw, posePitch;
 
 	/** Bumped each time Minecraft moves the player itself; Gorilla Tag must ack it. */
@@ -191,6 +195,11 @@ public final class GorillaSession {
 				poseZ = m.f64();
 				poseYaw = m.f32();
 				posePitch = m.f32();
+				for (double[] eye : eyes) {
+					eye[0] = m.f64();
+					eye[1] = m.f64();
+					eye[2] = m.f64();
+				}
 				havePose = true;
 				if (nowInMap && !inMap) {
 					inMap = true;
@@ -240,16 +249,25 @@ public final class GorillaSession {
 		return (wants & Proto.WANT_FRAMES) != 0 && driving() && havePose && poseAck >= teleportId;
 	}
 
-	public double poseX() {
-		return poseX;
+	private boolean stereo() {
+		return (wants & Proto.WANT_STEREO) != 0;
 	}
 
-	public double poseY() {
-		return poseY;
+	/** Which eye the camera draws for this frame: left and right take turns, or the head's centre. */
+	public int cameraEye() {
+		return stereo() ? nextEye : Proto.EYE_CENTER;
 	}
 
-	public double poseZ() {
-		return poseZ;
+	public double cameraX() {
+		return cameraEye() == Proto.EYE_CENTER ? poseX : eyes[cameraEye()][0];
+	}
+
+	public double cameraY() {
+		return cameraEye() == Proto.EYE_CENTER ? poseY : eyes[cameraEye()][1];
+	}
+
+	public double cameraZ() {
+		return cameraEye() == Proto.EYE_CENTER ? poseZ : eyes[cameraEye()][2];
 	}
 
 	public float poseYaw() {
@@ -266,8 +284,8 @@ public final class GorillaSession {
 
 	/** Called after every rendered frame. */
 	public void onFrameRendered() {
-		if (overlayActive()) {
-			frames.capture(Minecraft.getInstance());
+		if (overlayActive() && frames.capture(Minecraft.getInstance(), cameraEye()) && stereo()) {
+			nextEye = 1 - nextEye; // that eye is on its way: draw the other one next
 		}
 	}
 

@@ -21,6 +21,7 @@ static class Program
     static byte[] atlas;
     static Messages.Worlds worldsList;
     static Messages.Frame frame;
+    static readonly Messages.Frame[] eyeFrames = new Messages.Frame[3];
     static int frames;
     static int sectionUpdates;
     static readonly List<string> statuses = new();
@@ -33,7 +34,7 @@ static class Program
         Console.WriteLine($"linktest: waiting for {Path.Combine(dir, "ready")}");
         WaitFor(() => File.Exists(Path.Combine(dir, "ready")), 600, "world ready");
 
-        link = new LinkClient("127.0.0.1", port, s => Console.WriteLine("link: " + s), () => Proto.WantBlockMeshes | Proto.WantFrames);
+        link = new LinkClient("127.0.0.1", port, s => Console.WriteLine("link: " + s), () => Proto.WantBlockMeshes | Proto.WantFrames | Proto.WantStereo);
         link.Start();
 
         WaitFor(() => world != null && world.HasWorld, 30, "WORLD");
@@ -58,9 +59,10 @@ static class Program
         int ack = teleport.Id;
         for (int i = 0; i < 10; i++) { SendPose(true, ack, 0.5, -58.3, 0.5); Pump(50); }
 
-        // Overlay: Minecraft draws the gorilla's view and sends it back with depth.
-        WaitFor(() => frame != null, 15, "FRAME");
-        CheckFrame(frame);
+        // Overlay: Minecraft draws each eye's view in turn and sends it back with depth.
+        WaitFor(() => eyeFrames[0] != null && eyeFrames[1] != null, 15, "FRAMEs for both eyes");
+        Check(Math.Abs(eyeFrames[0].CamX - 0.532) < 0.001 && Math.Abs(eyeFrames[1].CamX - 0.468) < 0.001, "left and right frames are drawn from each eye");
+        CheckFrame(eyeFrames[0]);
 
         // Hotbar.
         WaitFor(() => hotbar != null, 10, "HOTBAR");
@@ -142,8 +144,10 @@ static class Program
         return failures == 0 ? 0 : 1;
     }
 
+    // Eyes 6.4 cm apart. Facing south (+Z), the left eye is towards +X.
     static void SendPose(bool inMap, int ack, double x, double y, double z) =>
-        link.Send(new FrameWriter(Proto.GtPose).U8(inMap ? 1 : 0).I32(ack).F64(x).F64(y).F64(z).F32(0).F32(30).Finish());
+        link.Send(new FrameWriter(Proto.GtPose).U8(inMap ? 1 : 0).I32(ack).F64(x).F64(y).F64(z).F32(0).F32(30)
+            .F64(x + 0.032).F64(y).F64(z).F64(x - 0.032).F64(y).F64(z).Finish());
 
     static void Use(int x, int y, int z, Proto.Face f, double hx, double hy, double hz) =>
         link.Send(new FrameWriter(Proto.GtUse).I32(x).I32(y).I32(z).U8((int)f).F64(hx).F64(hy).F64(hz).Finish());
@@ -168,7 +172,7 @@ static class Program
                     case Messages.Hotbar h: hotbar = h; break;
                     case Messages.Status st: statuses.Add(st.Text); break;
                     case Messages.Worlds ws: worldsList = ws; break;
-                    case Messages.Frame fr: frame = fr; frames++; break;
+                    case Messages.Frame fr: frame = fr; eyeFrames[Math.Clamp(fr.Eye, 0, 2)] = fr; frames++; break;
                 }
             }
             Thread.Sleep(5);
@@ -195,9 +199,9 @@ static class Program
     /// </summary>
     static void CheckFrame(Messages.Frame f)
     {
-        Console.WriteLine($"frame {f.Id}: {f.Width}x{f.Height} picture, {f.GridW}x{f.GridH} depth grid, camera {f.CamX:F2} {f.CamY:F2} {f.CamZ:F2}");
+        Console.WriteLine($"frame {f.Id} (eye {f.Eye}): {f.Width}x{f.Height} picture, {f.GridW}x{f.GridH} depth grid, camera {f.CamX:F2} {f.CamY:F2} {f.CamZ:F2}");
         Check(f.Width >= 64 && f.Height >= 64 && f.Rgb.Length == f.Width * f.Height * 3, "picture has a sane size");
-        Check(Math.Abs(f.CamX - 0.5) < 0.01 && Math.Abs(f.CamY - (-58.3)) < 0.01 && Math.Abs(f.CamZ - 0.5) < 0.01, "camera is at the gorilla's head");
+        Check(Math.Abs(f.CamX - 0.5) < 0.05 && Math.Abs(f.CamY - (-58.3)) < 0.01 && Math.Abs(f.CamZ - 0.5) < 0.01, "camera is at the gorilla's head");
         int mid = f.GridW / 2;
         float[] P(int gx, int gy) { int o = (gy * f.GridW + gx) * 3; return new[] { f.Points[o], f.Points[o + 1], f.Points[o + 2] }; }
         var bottom = P(mid, f.GridH - 1);

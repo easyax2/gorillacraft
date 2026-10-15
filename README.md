@@ -16,8 +16,8 @@ Tag features aren't in yet. This is interactions and maps only.
 
 ## What works
 
-- **Minecraft's real graphics (overlay):** Minecraft renders the view from your gorilla head
-  every frame (world, mobs, items, sky, day and night, weather, particles, lighting, resource
+- **Minecraft's real graphics (overlay), per eye:** Minecraft renders the view from your left
+  and right eye in turn (world, mobs, items, sky, day and night, weather, particles, lighting, resource
   packs, shaders it supports). Gorilla Tag shows that picture on a 3D surface built from where
   each part of it is, so it has real depth in VR, stays fixed in the world when you turn your
   head, and gorillas and hands sort against it. Gorilla Tag draws nothing of its own while you're
@@ -83,6 +83,7 @@ Gorilla Tag: `BepInEx/config/dev.gorillacraft.cfg`
 | `Hands.PunchSpeed` / `PunchHold` / `FistMode` | `2.0` / `0.4` / `false` | What counts as a punch, how long each punch mines, fist mode |
 | `Menu.OpenAtStart` / `Servers` | `true` / | Show the menu at start; servers joined from it |
 | `Performance.SectionsPerFrame` | `4` | Mesh/collider builds per frame |
+| `Rendering.PerEye` | `true` | Each eye gets its own Minecraft picture (Gorilla Tag switches to multi-pass rendering) |
 | `Rendering.Mode` | `Overlay` | `Overlay`: Minecraft's picture in 3D. `Blocks`: Gorilla Tag draws block meshes itself |
 | `Rendering.Shader` | `Universal Render Pipeline/Particles/Unlit` | Block shader (falls back to `Sprites/Default`) |
 
@@ -96,8 +97,9 @@ sections, `sectionsPerTick`, and for the overlay `overlayWidth`, `overlayGrid`, 
   against Gorilla Tag. Expect tuning: `BlockScale`, `TouchDistance` and the wrist panel position.
 - Container screens (chests, furnaces, crafting tables) can't be shown in Gorilla Tag yet. They
   close straight away. Use the Minecraft window for your inventory.
-- The overlay updates at Minecraft's frame rate (about 25–30 updates a second; the 3D surface
-  keeps head turning smooth in between). Fast movement shows edges where Minecraft hasn't drawn
+- The overlay updates at Minecraft's frame rate, shared between the eyes (each eye gets every
+  other frame: raise Minecraft's Max Framerate to 60+ if you can). The 3D surface keeps head
+  turning smooth in between. Fast movement shows edges where Minecraft hasn't drawn
   yet, and things right next to edges can look smeared until the next frame.
 - Mobs and items are in the picture but flattened onto the wall behind them (depth comes from
   blocks only).

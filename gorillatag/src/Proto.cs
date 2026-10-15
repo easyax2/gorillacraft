@@ -6,7 +6,7 @@ namespace GorillaCraft
     /// </summary>
     public static class Proto
     {
-        public const int Version = 3;
+        public const int Version = 4;
         public const int MaxFrame = 64 << 20;
 
         // Gorilla Tag → Minecraft
@@ -35,6 +35,9 @@ namespace GorillaCraft
         /// <summary>HELLO flags: what Gorilla Tag wants from Minecraft.</summary>
         public const byte WantBlockMeshes = 1;
         public const byte WantFrames = 2;
+        public const byte WantStereo = 4;
+
+        public const byte EyeLeft = 0, EyeRight = 1, EyeCenter = 2;
 
         public const byte ShapeFullCube = 0xFF;
 

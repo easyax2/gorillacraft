@@ -47,7 +47,8 @@ final class FrameCapture {
 	private boolean busy;
 	private boolean failed;
 	private int frameId;
-	private final java.util.concurrent.ExecutorService rayThread = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+	private static final int RAY_THREADS = Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 4));
+	private final java.util.concurrent.ExecutorService rayThread = java.util.concurrent.Executors.newFixedThreadPool(RAY_THREADS + 1, r -> {
 		Thread t = new Thread(r, "GorillaCraft overlay rays");
 		t.setDaemon(true);
 		return t;
@@ -60,15 +61,16 @@ final class FrameCapture {
 		this.cfg = cfg;
 	}
 
-	void capture(Minecraft mc) {
-		if (busy || failed || link.pendingBytes() > 1L << 20) {
-			return; // one frame in flight at a time; skip frames rather than queue them up
+	/** @return whether a frame was started (false: still busy with the last one, or nothing to grab). */
+	boolean capture(Minecraft mc, int eye) {
+		if (busy || failed || link.pendingBytes() > 2L << 20) {
+			return false; // one frame in flight at a time; skip frames rather than queue them up
 		}
 		RenderTarget target = mc.gameRenderer.mainRenderTarget();
 		GpuTexture color = target.getColorTexture();
 		ClientLevel level = mc.level;
 		if (color == null || level == null) {
-			return;
+			return false;
 		}
 		int w = color.getWidth(0);
 		int h = color.getHeight(0);
@@ -110,17 +112,19 @@ final class FrameCapture {
 							GorillaCraft.LOG.error("Overlay rays failed", e);
 							busy = false;
 						} else {
-							finish(w, h, pos);
+							finish(w, h, pos, eye);
 						}
 					})), 0);
 		} catch (RuntimeException e) {
 			GorillaCraft.LOG.error("Can't read Minecraft's frame back for the overlay", e);
 			failed = true;
 			busy = false;
+			return false;
 		}
+		return true;
 	}
 
-	private void finish(int w, int h, Vec3 cam) {
+	private void finish(int w, int h, Vec3 cam, int eye) {
 		try (GpuBufferSlice.MappedView cv = colorBuffer.map(true, false)) {
 			ByteBuffer colors = cv.data();
 
@@ -129,7 +133,7 @@ final class FrameCapture {
 			int iw = w / step;
 			int ih = h / step;
 			FrameWriter out = new FrameWriter(Proto.MC_FRAME, iw * ih * 3 + points.length * 4 + 64);
-			out.i32(++frameId).f64(cam.x).f64(cam.y).f64(cam.z).i32(iw).i32(ih);
+			out.i32(++frameId).u8(eye).f64(cam.x).f64(cam.y).f64(cam.z).i32(iw).i32(ih);
 			byte[] row = new byte[iw * 3];
 			for (int y = 0; y < ih; y++) {
 				int src = h - 1 - y * step; // GPU rows start at the bottom
@@ -172,11 +176,32 @@ final class FrameCapture {
 		}
 		gridW = gw;
 		gridH = gh;
-		Vector4f p = new Vector4f();
 		float ndcZ = zeroToOne ? 0.5f : 0f;
+		// Rows are split between a few threads; they only read blocks.
+		var parts = new java.util.ArrayList<java.util.concurrent.Future<?>>();
+		for (int t = 0; t < RAY_THREADS; t++) {
+			int from = gh * t / RAY_THREADS, to = gh * (t + 1) / RAY_THREADS;
+			Runnable rows = () -> castRows(level, cam, inverse, ndcZ, gw, gh, from, to, maxDistance);
+			if (t == RAY_THREADS - 1) {
+				rows.run();
+			} else {
+				parts.add(rayThread.submit(rows));
+			}
+		}
+		for (var f : parts) {
+			try {
+				f.get();
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}
+	}
+
+	private void castRows(ClientLevel level, Vec3 cam, Matrix4f inverse, float ndcZ, int gw, int gh, int fromRow, int toRow, float maxDistance) {
+		Vector4f p = new Vector4f();
 		CollisionContext context = CollisionContext.empty();
-		int o = 0;
-		for (int gy = 0; gy < gh; gy++) {
+		int o = fromRow * gw * 3;
+		for (int gy = fromRow; gy < toRow; gy++) {
 			float ndcY = 1f - 2f * gy / (gh - 1); // top row first
 			for (int gx = 0; gx < gw; gx++) {
 				float ndcX = 2f * gx / (gw - 1) - 1f;

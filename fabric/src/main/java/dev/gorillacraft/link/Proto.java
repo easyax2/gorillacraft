@@ -6,7 +6,7 @@ package dev.gorillacraft.link;
  * length counts the type byte and the payload.
  */
 public final class Proto {
-	public static final int VERSION = 3;
+	public static final int VERSION = 4;
 	public static final int MAX_FRAME = 64 << 20;
 
 	// Gorilla Tag → Minecraft
@@ -35,6 +35,12 @@ public final class Proto {
 	/** GT_HELLO flags: what Gorilla Tag wants. */
 	public static final int WANT_BLOCK_MESHES = 1;
 	public static final int WANT_FRAMES = 2;
+	/** Frames alternate between the two eyes' positions (with WANT_FRAMES). */
+	public static final int WANT_STEREO = 4;
+
+	public static final int EYE_LEFT = 0;
+	public static final int EYE_RIGHT = 1;
+	public static final int EYE_CENTER = 2;
 
 	/** Block shape entry flag: the block's outline is the full unit cube. */
 	public static final int SHAPE_FULL_CUBE = 0xFF;

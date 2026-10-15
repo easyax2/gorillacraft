@@ -20,7 +20,7 @@ namespace GorillaCraft
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.4.1";
+        public const string Version = "0.5.0";
 
         internal static ManualLogSource Log;
 
@@ -36,6 +36,8 @@ namespace GorillaCraft
         private ConfigEntry<int> sectionsPerFrame;
         private ConfigEntry<string> shaderName;
         private ConfigEntry<string> renderMode;
+        private ConfigEntry<bool> perEye;
+        private bool perEyeLogged;
         private ConfigEntry<bool> autoInstall;
         private ConfigEntry<bool> autoLaunch;
         private ConfigEntry<string> prismPath;
@@ -52,7 +54,7 @@ namespace GorillaCraft
         private HandInteraction hands;
         private OverlayView overlay;
         private readonly GorillaOnlyView gorillaOnly = new GorillaOnlyView();
-        private Messages.Frame latestFrame;
+        private readonly Messages.Frame[] latestFrames = new Messages.Frame[3]; // newest per eye
         private WristDisplay wrist;
 
         private readonly Dictionary<(int, int, int), Messages.Section> pendingSections = new Dictionary<(int, int, int), Messages.Section>();
@@ -92,6 +94,11 @@ namespace GorillaCraft
                 "Overlay: Minecraft draws the world (its real graphics: mobs, sky, lighting) and Gorilla Tag shows that picture in 3D. " +
                 "Blocks: Gorilla Tag draws Minecraft's block meshes itself (older mode, lighter on the GPU). Restart after changing.",
                 new AcceptableValueList<string>("Overlay", "Blocks")));
+            perEye = Config.Bind("Rendering", "PerEye", true,
+                "Overlay: Minecraft draws each eye's view separately (left and right take turns), and Gorilla Tag renders the eyes " +
+                "one after the other so each sees its own picture. Off: one picture from the middle of your head for both eyes (lighter). Restart after changing.");
+            if (OverlayMode && perEye.Value)
+                ForceMultiPass();
             autoInstall = Config.Bind("Minecraft", "AutoInstall", true, "Create/update the GorillaCraft instance in Prism Launcher (Minecraft 26.3, Fabric, Fabric API, this mod) when Gorilla Tag starts.");
             autoLaunch = Config.Bind("Minecraft", "AutoLaunch", true, "Start that instance through Prism Launcher if Minecraft isn't running (Windows only; on Linux use the Steam launch option from the guide).");
             prismPath = Config.Bind("Minecraft", "PrismPath", "", "Full path to prismlauncher.exe. Empty: look in the usual install folders.");
@@ -105,7 +112,7 @@ namespace GorillaCraft
             launchCheckAt = Time.realtimeSinceStartup + 5f;
 
             link = new LinkClient(host.Value, port.Value, s => Log.LogInfo(s),
-                () => OverlayMode ? Proto.WantFrames : Proto.WantBlockMeshes);
+                () => OverlayMode ? (byte)(Proto.WantFrames | (perEye.Value ? Proto.WantStereo : 0)) : Proto.WantBlockMeshes);
             link.Start();
         }
 
@@ -155,6 +162,54 @@ namespace GorillaCraft
         void MainMenu.IHost.LeaveWorld() => link.Send(new FrameWriter(Proto.GtLeaveWorld).Finish());
 
         private bool OverlayMode => renderMode.Value != "Blocks";
+
+        /// <summary>
+        /// Per-eye pictures need Gorilla Tag to render the two eyes in separate passes. VR starts
+        /// after BepInEx loads plugins, so setting the XR plugins' stereo mode here takes effect.
+        /// </summary>
+        private static void ForceMultiPass()
+        {
+            try
+            {
+                var openVr = Unity.XR.OpenVR.OpenVRSettings.GetSettings(false);
+                if (openVr != null)
+                {
+                    openVr.StereoRenderingMode = Unity.XR.OpenVR.OpenVRSettings.StereoRenderingModes.MultiPass;
+                    Log.LogInfo("OpenVR set to multi-pass stereo for per-eye Minecraft pictures");
+                }
+            }
+            catch (System.Exception e)
+            {
+                Log.LogWarning("Couldn't set OpenVR stereo mode: " + e.Message);
+            }
+            try
+            {
+                var openXr = UnityEngine.XR.OpenXR.OpenXRSettings.Instance;
+                if (openXr != null)
+                    openXr.renderMode = UnityEngine.XR.OpenXR.OpenXRSettings.RenderMode.MultiPass;
+            }
+            catch (System.Exception e)
+            {
+                Log.LogWarning("Couldn't set OpenXR stereo mode: " + e.Message);
+            }
+        }
+
+        /// <summary>Where each eye is, in Unity world space: from the XR eye poses, or head ± half the eye distance.</summary>
+        private static void EyePositions(Camera cam, out Vector3 left, out Vector3 right)
+        {
+            if (cam != null && cam.stereoEnabled)
+            {
+                left = cam.GetStereoViewMatrix(Camera.StereoscopicEye.Left).inverse.MultiplyPoint(Vector3.zero);
+                right = cam.GetStereoViewMatrix(Camera.StereoscopicEye.Right).inverse.MultiplyPoint(Vector3.zero);
+                float d = Vector3.Distance(left, right);
+                if (d > 0.01f && d < 1f && Vector3.Distance((left + right) * 0.5f, cam.transform.position) < 0.2f)
+                    return;
+            }
+            Transform t = cam != null ? cam.transform : GTPlayer.Instance.headCollider.transform;
+            float half = 0.032f * (t.parent != null ? t.parent.lossyScale.x : 1f);
+            left = t.position - t.right * half;
+            right = t.position + t.right * half;
+        }
 
         private void OnDestroy()
         {
@@ -260,17 +315,27 @@ namespace GorillaCraft
             while (link.TryReceive(out object msg))
             {
                 if (msg is Messages.Frame f)
-                    latestFrame = f; // only the newest picture matters
+                    latestFrames[Mathf.Clamp(f.Eye, 0, 2)] = f; // only the newest picture per eye matters
                 else
                     Handle(msg);
             }
             ApplySections();
             gorillaOnly.Update();
-            if (latestFrame != null)
+            for (int e = 0; e < latestFrames.Length; e++)
             {
-                if (overlay != null && inMap)
-                    overlay.Show(latestFrame, world.Coords);
-                latestFrame = null;
+                Messages.Frame frame = latestFrames[e];
+                if (frame == null)
+                    continue;
+                latestFrames[e] = null;
+                if (overlay == null || !inMap)
+                    continue;
+                overlay.Show(frame, world.Coords);
+                if (!perEyeLogged && frame.Eye != Proto.EyeCenter && Time.frameCount % 90 == 0)
+                {
+                    perEyeLogged = true;
+                    Log.LogInfo(overlay.PerEyeSeen ? "Per-eye Minecraft pictures: each eye sees its own" :
+                        "Per-eye pictures arrive, but Gorilla Tag renders both eyes together (single-pass): both eyes see one picture");
+                }
             }
 
             CheckMinecraft();
@@ -481,8 +546,18 @@ namespace GorillaCraft
             Vector3 head = holding ? holdPosition : cam.position;
             world.Coords.ToMinecraft(head, out double x, out double y, out double z);
             Coords.LookAngles(cam.forward, out float yaw, out float pitch);
+            EyePositions(player.mainCamera, out Vector3 leftEye, out Vector3 rightEye);
+            if (holding)
+            {
+                Vector3 offset = holdPosition - cam.position;
+                leftEye += offset;
+                rightEye += offset;
+            }
+            world.Coords.ToMinecraft(leftEye, out double lx, out double ly, out double lz);
+            world.Coords.ToMinecraft(rightEye, out double rx, out double ry, out double rz);
             link.Send(new FrameWriter(Proto.GtPose).U8(inMap ? 1 : 0).I32(teleportAck)
-                .F64(x).F64(y).F64(z).F32(yaw).F32(pitch).Finish());
+                .F64(x).F64(y).F64(z).F32(yaw).F32(pitch)
+                .F64(lx).F64(ly).F64(lz).F64(rx).F64(ry).F64(rz).Finish());
         }
     }
 }

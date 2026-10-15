@@ -23,7 +23,7 @@ public final class ClientConfig {
 	/** Overlay mode: width the picture sent to Gorilla Tag is scaled down to (at most). */
 	public int overlayWidth = 1280;
 	/** Overlay mode: depth grid columns (rows follow the window's shape). */
-	public int overlayGrid = 160;
+	public int overlayGrid = 128;
 	/** Overlay mode: vertical field of view Minecraft renders with, in degrees. */
 	public int overlayFov = 110;
 

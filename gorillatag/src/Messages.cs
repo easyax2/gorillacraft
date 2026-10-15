@@ -77,6 +77,8 @@ namespace GorillaCraft
         public sealed class Frame
         {
             public int Id;
+            /// <summary>Proto.EyeLeft / EyeRight / EyeCenter.</summary>
+            public int Eye;
             /// <summary>Camera position the frame was drawn from (Minecraft coordinates).</summary>
             public double CamX, CamY, CamZ;
             public int Width, Height;
@@ -130,7 +132,7 @@ namespace GorillaCraft
                 case Proto.McStatus:
                     return new Status { Text = r.Str() };
                 case Proto.McFrame:
-                    var f = new Frame { Id = r.I32(), CamX = r.F64(), CamY = r.F64(), CamZ = r.F64(), Width = r.I32(), Height = r.I32() };
+                    var f = new Frame { Id = r.I32(), Eye = r.U8(), CamX = r.F64(), CamY = r.F64(), CamZ = r.F64(), Width = r.I32(), Height = r.I32() };
                     f.Rgb = r.Bytes(f.Width * f.Height * 3);
                     f.GridW = r.I32();
                     f.GridH = r.I32();

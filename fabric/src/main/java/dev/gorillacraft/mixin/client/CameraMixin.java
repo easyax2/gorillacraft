@@ -12,9 +12,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * In overlay mode Minecraft draws what the gorilla's head sees: every frame the camera goes to
- * Gorilla Tag's latest head pose (not the player's tick-interpolated position), with a wide,
- * fixed field of view so the picture covers both eyes and some head turning.
+ * In overlay mode Minecraft draws what the gorilla sees: every frame the camera goes to Gorilla
+ * Tag's latest pose (not the player's tick-interpolated position), at one eye or the other in
+ * turn for per-eye frames, with a wide, fixed field of view that covers some head turning.
  */
 @Mixin(Camera.class)
 public abstract class CameraMixin {
@@ -28,7 +28,7 @@ public abstract class CameraMixin {
 	private void gorillacraft$headPose(DeltaTracker deltaTracker, CallbackInfo ci) {
 		GorillaSession session = GorillaCraftClient.session();
 		if (session != null && session.overlayActive()) {
-			setPosition(session.poseX(), session.poseY(), session.poseZ());
+			setPosition(session.cameraX(), session.cameraY(), session.cameraZ());
 			setRotation(session.poseYaw(), session.posePitch());
 		}
 	}
