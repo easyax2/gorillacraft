@@ -20,7 +20,8 @@ Tag features aren't in yet. This is interactions and maps only.
   every frame (world, mobs, items, sky, day and night, weather, particles, lighting, resource
   packs, shaders it supports). Gorilla Tag shows that picture on a 3D surface built from where
   each part of it is, so it has real depth in VR, stays fixed in the world when you turn your
-  head, and gorillas and hands sort against it. Nothing is re-drawn by Gorilla Tag itself.
+  head, and gorillas and hands sort against it. Gorilla Tag draws nothing of its own while you're
+  in the map except gorillas: no Gorilla Tag sky or scenery, black outside Minecraft's view.
 - **Maps:** any Minecraft world, singleplayer or a server. Its collision shapes are real (but
   invisible) Gorilla Tag colliders you can climb, streamed in around you (4 chunks by default).
   The older mode, where Gorilla Tag draws Minecraft's block meshes itself, is still there as

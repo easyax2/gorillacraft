@@ -3,7 +3,7 @@
 This guide takes you from a plain Gorilla Tag and Minecraft install to climbing around your
 Minecraft world as a gorilla. Each step says how to check that it worked before you move on.
 
-> **Early release.** GorillaCraft 0.4.0 has been tested end to end with a real Minecraft client
+> **Early release.** GorillaCraft 0.4.1 has been tested end to end with a real Minecraft client
 > and a stand-in for Gorilla Tag, but not yet in a VR headset. Things like the size of blocks and
 > how close your hand has to be may need tuning (see [Settings](#7-settings)). Please report what
 > you find.
@@ -27,7 +27,8 @@ Minecraft world as a gorilla. Each step says how to check that it worked before 
 **How it looks:** you're a gorilla in Gorilla Tag, and around you is Minecraft's real picture
 of its world: Minecraft draws the view from your gorilla head, and Gorilla Tag shows it in 3D.
 So you get Minecraft's graphics (mobs, sky, day and night, weather, lighting) with Gorilla Tag's
-movement. Minecraft runs in a window on your desktop while you play.
+movement. While you're in the map, Gorilla Tag draws nothing of its own except gorillas (yours
+and other players', with cosmetics). Minecraft runs in a window on your desktop while you play.
 
 **Short version:** install BepInEx in Gorilla Tag, install Prism Launcher and sign in once, then put
 `GorillaCraft.dll` in `BepInEx\plugins\GorillaCraft\`. When you start Gorilla Tag, GorillaCraft
@@ -44,7 +45,7 @@ you into it. You don't install anything in Minecraft yourself.
 | **Minecraft: Java Edition** | Owned on your Microsoft account. GorillaCraft uses version 26.3, and Prism downloads it for you. |
 | **[Prism Launcher](https://prismlauncher.org/download/windows/)** | Free Minecraft launcher. GorillaCraft uses it to install and start Minecraft for you. |
 | **A reasonably strong PC** | Both games run at once. Plan for 16 GB of RAM and a GPU that already runs Gorilla Tag comfortably. |
-| **From the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)** | `GorillaCraft.dll`, or `GorillaCraft-0.4.0-GorillaTag.zip` with the same dll already in its folders. The Minecraft mod is inside the dll; the separate `.jar` is only for servers and manual installs. |
+| **From the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)** | `GorillaCraft.dll`, or `GorillaCraft-0.4.1-GorillaTag.zip` with the same dll already in its folders. The Minecraft mod is inside the dll; the separate `.jar` is only for servers and manual installs. |
 
 **Utilla isn't needed.** GorillaCraft works:
 
@@ -108,9 +109,9 @@ You don't need to create an instance or download any mods. GorillaCraft does tha
 **Check:** start Gorilla Tag, then open `BepInEx\LogOutput.log` in Notepad. You should see:
 
 ```
-[Info   :   BepInEx] Loading [GorillaCraft 0.4.0]
+[Info   :   BepInEx] Loading [GorillaCraft 0.4.1]
 [Info   :GorillaCraft] Ready (block colliders on layer 0)
-[Info   :GorillaCraft] Prism instance in C:\Users\...\AppData\Roaming\PrismLauncher: created instance; set window size for the overlay; installed gorillacraft-fabric-0.4.0+26.3.jar; installed fabric-api-0.161.0+26.3.jar
+[Info   :GorillaCraft] Prism instance in C:\Users\...\AppData\Roaming\PrismLauncher: created instance; set window size for the overlay; installed gorillacraft-fabric-0.4.1+26.3.jar; installed fabric-api-0.161.0+26.3.jar
 ```
 
 `BepInEx\config\dev.gorillacraft.cfg` now exists too. That's the settings file (see
@@ -301,7 +302,7 @@ You need [Java 25](https://adoptium.net/) on the server PC.
 4. Open `eula.txt`, change `eula=false` to `eula=true`, save.
 5. Put **two jars** into the new `mods` folder:
    - **Fabric API** for 26.3, from [Modrinth](https://modrinth.com/mod/fabric-api)
-   - `gorillacraft-fabric-0.4.0+26.3.jar` from the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)
+   - `gorillacraft-fabric-0.4.1+26.3.jar` from the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)
 6. Optional, in `server.properties`:
    - `gamemode=creative` (and `force-gamemode=true`) for building, or leave survival
    - `difficulty=peaceful` if you don't want mobs attacking gorillas
@@ -378,7 +379,8 @@ Gorilla Tag in VR needs steady frame rates. Minecraft running in the background 
 | Wrist says "Open a Minecraft world" | Minecraft is connected but on the title screen. Open a world. |
 | "GorillaCraft is off in public lobbies" | You're in a public room. Leave it, or use a private room code. |
 | You fall through the world after entering | Blocks didn't arrive in time. Hold B + Y twice to re-enter. Check Minecraft's log for errors. |
-| You see nothing / only Gorilla Tag's sky in the map (overlay) | The Minecraft window must be open and not minimised, and in the world. Check Minecraft's log for `Overlay:` lines and errors. Try `Rendering.Mode = Blocks` to rule out the overlay. |
+| Some Gorilla Tag scenery still shows in the map | BepInEx's log has a line `Gorilla-only view keeps layers ...`; please report it in an issue with that line. |
+| You see nothing / only black in the map (overlay) | The Minecraft window must be open and not minimised, and in the world. Check Minecraft's log for `Overlay:` lines and errors. Try `Rendering.Mode = Blocks` to rule out the overlay. |
 | The overlay is blurry | Make the Minecraft window bigger (Prism: instance settings → Window size), or lower `overlayFov` a little. |
 | The overlay lags or smears when you move fast | Raise Minecraft's Max Framerate, lower `overlayGrid`. A bit of smearing at edges right after fast moves is expected. |
 | Blocks are **pink/magenta** or invisible | The block shader isn't available in your Gorilla Tag version. In `dev.gorillacraft.cfg` set `Shader = Sprites/Default` and restart. Also check the log line `Block shader: ...`. |

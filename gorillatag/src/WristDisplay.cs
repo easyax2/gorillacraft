@@ -33,6 +33,7 @@ namespace GorillaCraft
             text.textWrappingMode = TextWrappingModes.Normal;
             text.rectTransform.sizeDelta = new Vector2(0.22f, 0.3f);
             text.color = Color.white;
+            GorillaOnlyView.Assign(go);
             go.SetActive(false);
         }
 

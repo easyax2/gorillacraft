@@ -20,7 +20,7 @@ namespace GorillaCraft
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.4.0";
+        public const string Version = "0.4.1";
 
         internal static ManualLogSource Log;
 
@@ -51,6 +51,7 @@ namespace GorillaCraft
         private MinecraftWorld world;
         private HandInteraction hands;
         private OverlayView overlay;
+        private readonly GorillaOnlyView gorillaOnly = new GorillaOnlyView();
         private Messages.Frame latestFrame;
         private WristDisplay wrist;
 
@@ -157,6 +158,7 @@ namespace GorillaCraft
 
         private void OnDestroy()
         {
+            gorillaOnly.Disable();
             link?.Dispose();
         }
 
@@ -263,6 +265,7 @@ namespace GorillaCraft
                     Handle(msg);
             }
             ApplySections();
+            gorillaOnly.Update();
             if (latestFrame != null)
             {
                 if (overlay != null && inMap)
@@ -415,7 +418,10 @@ namespace GorillaCraft
             inMap = true;
             world.Visible = true;
             if (overlay != null)
+            {
                 overlay.Visible = true;
+                gorillaOnly.Enable(); // Gorilla Tag draws only gorillas; Minecraft draws everything else
+            }
             wrist.Visible = true;
             SetStatus("Entering Minecraft...");
             // Minecraft answers the inMap pose with a teleport to where its player is.
@@ -429,6 +435,7 @@ namespace GorillaCraft
             world.Visible = false;
             if (overlay != null)
                 overlay.Visible = false;
+            gorillaOnly.Disable();
             wrist.Visible = false;
             GTPlayer.Instance.TeleportTo(returnPosition, GTPlayer.Instance.transform.rotation, false, true);
             if (reason != null)
