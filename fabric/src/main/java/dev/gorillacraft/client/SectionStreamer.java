@@ -34,7 +34,7 @@ final class SectionStreamer {
 		DIRTY.clear();
 	}
 
-	void tick(ClientLevel level, Entity center, LinkServer link, ClientConfig cfg) {
+	void tick(ClientLevel level, Entity center, LinkServer link, ClientConfig cfg, boolean renderQuads) {
 		int cx = SectionPos.blockToSectionCoord(center.getBlockX());
 		int cy = SectionPos.blockToSectionCoord(center.getBlockY());
 		int cz = SectionPos.blockToSectionCoord(center.getBlockZ());
@@ -86,7 +86,7 @@ final class SectionStreamer {
 		int budget = cfg.sectionsPerTick;
 		for (int i = 0; i < candidates.size() && budget > 0 && link.pendingBytes() < MAX_PENDING_BYTES; i++) {
 			long s = candidates.getLong(i);
-			byte[] frame = mesher.mesh(level, SectionPos.x(s), SectionPos.y(s), SectionPos.z(s));
+			byte[] frame = mesher.mesh(level, SectionPos.x(s), SectionPos.y(s), SectionPos.z(s), renderQuads);
 			if (frame == null) {
 				continue; // chunk not loaded yet
 			}

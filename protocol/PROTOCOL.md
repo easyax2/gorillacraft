@@ -1,4 +1,4 @@
-# GorillaCraft link protocol (version 2)
+# GorillaCraft link protocol (version 3)
 
 Loopback TCP. Minecraft listens on `127.0.0.1:47123` (configurable), Gorilla Tag connects and
 reconnects as needed. One Gorilla Tag at a time; a new connection replaces the old one.
@@ -19,7 +19,7 @@ Faces use Minecraft's `Direction` 3D data value: 0 down, 1 up, 2 north, 3 south,
 
 | Type | Name | Payload |
 |---|---|---|
-| 0x01 | HELLO | `i32 protocolVersion, str pluginVersion` |
+| 0x01 | HELLO | `i32 protocolVersion, str pluginVersion, u8 wants` — bit 1: block meshes (and the atlas), bit 2: overlay frames. Collision and shapes are always sent. |
 | 0x02 | POSE | `u8 inMap, i32 teleportAck, f64 x, f64 y, f64 z (eyes), f32 yaw, f32 pitch` — ~50 Hz while in the map, and on every inMap change |
 | 0x03 | MINE | `u8 active, i32 x, i32 y, i32 z, u8 face` — sent when the mined block/face changes or mining stops |
 | 0x04 | USE | `i32 x, i32 y, i32 z, u8 face, f64 hitX, f64 hitY, f64 hitZ` — one right-click on that block |
@@ -41,6 +41,7 @@ Faces use Minecraft's `Direction` 3D data value: 0 down, 1 up, 2 north, 3 south,
 | 0x86 | TELEPORT | `i32 id, f64 x, f64 y, f64 z (eyes), f32 yaw` |
 | 0x87 | HOTBAR | `u8 selected`, then 9 × `str name, u8 count` |
 | 0x88 | STATUS | `str text` |
+| 0x8A | FRAME | overlay picture, see below |
 | 0x89 | WORLDS | `i32 n`, then n × `str id, str name` — singleplayer worlds, most recently played first (not the one that's open) |
 
 ### SECTION
@@ -59,6 +60,25 @@ i32 shapeCount
 All quads are wound counter-clockwise seen from outside (Minecraft's convention). Vertex colour
 already includes biome tint, ambient occlusion, face shading and light level. Collision faces
 between two full cubes are left out, and so are shapes of full cubes buried on all six sides.
+
+### FRAME
+
+Sent after Minecraft renders a frame from the gorilla's head pose (only while Gorilla Tag is in
+the map and asked for frames; one in flight at a time).
+
+```
+i32 frameId
+f64 camX, camY, camZ          camera position the frame was drawn from
+i32 width, height
+width × height × (u8 r, g, b)  the picture, rows top to bottom
+i32 gridW, gridH
+gridW × gridH × (f32 x, y, z)  where each grid point of the picture is, relative to the camera
+                               (Minecraft axes), rows top to bottom; sky at 600 blocks
+```
+
+Grid points are ray casts from the camera through the picture into Minecraft's blocks (visual
+shapes and fluids), so they match the picture except for entities. Gorilla Tag stretches the
+picture over the grid.
 
 ## Teleports
 

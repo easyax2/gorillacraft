@@ -20,7 +20,7 @@ namespace GorillaCraft
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.3.0";
+        public const string Version = "0.4.0";
 
         internal static ManualLogSource Log;
 
@@ -35,6 +35,7 @@ namespace GorillaCraft
         private ConfigEntry<bool> autoEnter;
         private ConfigEntry<int> sectionsPerFrame;
         private ConfigEntry<string> shaderName;
+        private ConfigEntry<string> renderMode;
         private ConfigEntry<bool> autoInstall;
         private ConfigEntry<bool> autoLaunch;
         private ConfigEntry<string> prismPath;
@@ -49,6 +50,8 @@ namespace GorillaCraft
         private LinkClient link;
         private MinecraftWorld world;
         private HandInteraction hands;
+        private OverlayView overlay;
+        private Messages.Frame latestFrame;
         private WristDisplay wrist;
 
         private readonly Dictionary<(int, int, int), Messages.Section> pendingSections = new Dictionary<(int, int, int), Messages.Section>();
@@ -84,6 +87,10 @@ namespace GorillaCraft
             autoEnter = Config.Bind("Map", "AutoEnter", true, "Enter the Minecraft map as soon as Minecraft is ready (alone, in a private room or in a modded lobby). Hold B+Y for a second to enter or leave by hand.");
             sectionsPerFrame = Config.Bind("Performance", "SectionsPerFrame", 4, "How many 16x16x16 block sections to build per frame.");
             shaderName = Config.Bind("Rendering", "Shader", "Universal Render Pipeline/Particles/Unlit", "Shader used for blocks.");
+            renderMode = Config.Bind("Rendering", "Mode", "Overlay", new ConfigDescription(
+                "Overlay: Minecraft draws the world (its real graphics: mobs, sky, lighting) and Gorilla Tag shows that picture in 3D. " +
+                "Blocks: Gorilla Tag draws Minecraft's block meshes itself (older mode, lighter on the GPU). Restart after changing.",
+                new AcceptableValueList<string>("Overlay", "Blocks")));
             autoInstall = Config.Bind("Minecraft", "AutoInstall", true, "Create/update the GorillaCraft instance in Prism Launcher (Minecraft 26.3, Fabric, Fabric API, this mod) when Gorilla Tag starts.");
             autoLaunch = Config.Bind("Minecraft", "AutoLaunch", true, "Start that instance through Prism Launcher if Minecraft isn't running (Windows only; on Linux use the Steam launch option from the guide).");
             prismPath = Config.Bind("Minecraft", "PrismPath", "", "Full path to prismlauncher.exe. Empty: look in the usual install folders.");
@@ -96,7 +103,8 @@ namespace GorillaCraft
                 list => servers.Value = string.Join(";", list), menuAtStart.Value);
             launchCheckAt = Time.realtimeSinceStartup + 5f;
 
-            link = new LinkClient(host.Value, port.Value, s => Log.LogInfo(s));
+            link = new LinkClient(host.Value, port.Value, s => Log.LogInfo(s),
+                () => OverlayMode ? Proto.WantFrames : Proto.WantBlockMeshes);
             link.Start();
         }
 
@@ -144,6 +152,8 @@ namespace GorillaCraft
         void MainMenu.IHost.OpenWorld(string id) { wantEnter = true; link.Send(new FrameWriter(Proto.GtOpenWorld).Str(id).Finish()); }
         void MainMenu.IHost.JoinServer(string address) { wantEnter = true; link.Send(new FrameWriter(Proto.GtJoinServer).Str(address).Finish()); }
         void MainMenu.IHost.LeaveWorld() => link.Send(new FrameWriter(Proto.GtLeaveWorld).Finish());
+
+        private bool OverlayMode => renderMode.Value != "Blocks";
 
         private void OnDestroy()
         {
@@ -219,6 +229,8 @@ namespace GorillaCraft
             world.Coords.Scale = Mathf.Max(0.05f, blockScale.Value);
             Shader highlightShader = Shader.Find(shaderName.Value) ?? Shader.Find("Sprites/Default");
             hands = new HandInteraction(world, link, touchDistance.Value, punchSpeed.Value, punchHold.Value, fistMode.Value, highlightShader);
+            if (OverlayMode)
+                overlay = new OverlayView(highlightShader);
             wrist = new WristDisplay(player.GetControllerTransform(true));
             wrist.SetConnected(link.Connected);
             Log.LogInfo($"Ready (block colliders on layer {layer})");
@@ -244,8 +256,19 @@ namespace GorillaCraft
                 return;
 
             while (link.TryReceive(out object msg))
-                Handle(msg);
+            {
+                if (msg is Messages.Frame f)
+                    latestFrame = f; // only the newest picture matters
+                else
+                    Handle(msg);
+            }
             ApplySections();
+            if (latestFrame != null)
+            {
+                if (overlay != null && inMap)
+                    overlay.Show(latestFrame, world.Coords);
+                latestFrame = null;
+            }
 
             CheckMinecraft();
             UpdateToggle();
@@ -391,6 +414,8 @@ namespace GorillaCraft
             returnPosition = player.mainCamera.transform.position;
             inMap = true;
             world.Visible = true;
+            if (overlay != null)
+                overlay.Visible = true;
             wrist.Visible = true;
             SetStatus("Entering Minecraft...");
             // Minecraft answers the inMap pose with a teleport to where its player is.
@@ -402,6 +427,8 @@ namespace GorillaCraft
             holding = false;
             hands.Stop();
             world.Visible = false;
+            if (overlay != null)
+                overlay.Visible = false;
             wrist.Visible = false;
             GTPlayer.Instance.TeleportTo(returnPosition, GTPlayer.Instance.transform.rotation, false, true);
             if (reason != null)
@@ -439,7 +466,7 @@ namespace GorillaCraft
             bool changed = inMap != sentInMap;
             if (!changed && (!inMap || Time.time < nextPoseTime))
                 return;
-            nextPoseTime = Time.time + 0.02f;
+            nextPoseTime = Time.time + (overlay != null ? 0f : 0.02f); // overlay: Minecraft's camera follows every frame
             sentInMap = inMap;
 
             GTPlayer player = GTPlayer.Instance;

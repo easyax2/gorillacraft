@@ -37,6 +37,12 @@ public final class GorillaSession {
 	private final SectionStreamer streamer = new SectionStreamer();
 	private final AtlasExporter atlas = new AtlasExporter();
 	private final MenuActions menu;
+	private final FrameCapture frames;
+	/** What Gorilla Tag asked for in its hello (Proto.WANT_*). */
+	private int wants = Proto.WANT_BLOCK_MESHES;
+	private boolean overlayWasActive;
+	private boolean savedHideGui;
+	private boolean savedBobView;
 
 	private int connection;
 	private ClientLevel worldSentFor;
@@ -67,6 +73,7 @@ public final class GorillaSession {
 		this.link = link;
 		this.cfg = cfg;
 		this.menu = new MenuActions(link, this::status);
+		this.frames = new FrameCapture(link, cfg);
 	}
 
 	/** True while Gorilla Tag is moving the Minecraft player. */
@@ -127,7 +134,7 @@ public final class GorillaSession {
 		// The Minecraft window is hidden behind Gorilla Tag; losing focus must not pause the game.
 		mc.options.pauseOnLostFocus = false;
 
-		if (!atlasSent && !atlas.pending()) {
+		if ((wants & Proto.WANT_BLOCK_MESHES) != 0 && !atlasSent && !atlas.pending()) {
 			atlas.request();
 		}
 		if (atlas.pending()) {
@@ -139,14 +146,16 @@ public final class GorillaSession {
 		}
 
 		updatePresence(mc);
+		updateOverlay(mc);
 		tickScreens(mc, player);
 		tickMining(mc, player);
 		tickHotbar(player);
-		streamer.tick(level, player, link, cfg);
+		streamer.tick(level, player, link, cfg, (wants & Proto.WANT_BLOCK_MESHES) != 0);
 	}
 
 	private void onConnectionChanged(int cid) {
 		connection = cid;
+		wants = Proto.WANT_BLOCK_MESHES;
 		worldSentFor = null;
 		noWorldSent = false;
 		atlasSent = false;
@@ -166,6 +175,9 @@ public final class GorillaSession {
 			case Proto.GT_HELLO -> {
 				int version = m.i32();
 				String gt = m.str();
+				wants = version >= 3 ? m.u8() : Proto.WANT_BLOCK_MESHES;
+				frames.reset();
+				streamer.reset(); // resend sections in the form it wants
 				GorillaCraft.LOG.info("Gorilla Tag plugin {} (protocol {}) connected", gt, version);
 				if (version != Proto.VERSION) {
 					status("Protocol mismatch: Gorilla Tag plugin speaks " + version + ", Minecraft mod speaks " + Proto.VERSION + ". Update both halves.");
@@ -220,6 +232,67 @@ public final class GorillaSession {
 			case Proto.GT_JOIN_SERVER -> menu.joinServer(mc, m.str());
 			case Proto.GT_LEAVE_WORLD -> menu.leave(mc);
 			default -> GorillaCraft.LOG.warn("Unknown message 0x{} from Gorilla Tag", Integer.toHexString(m.type));
+		}
+	}
+
+	/** True while Minecraft draws the gorilla's view for Gorilla Tag's overlay. */
+	public boolean overlayActive() {
+		return (wants & Proto.WANT_FRAMES) != 0 && driving() && havePose && poseAck >= teleportId;
+	}
+
+	public double poseX() {
+		return poseX;
+	}
+
+	public double poseY() {
+		return poseY;
+	}
+
+	public double poseZ() {
+		return poseZ;
+	}
+
+	public float poseYaw() {
+		return poseYaw;
+	}
+
+	public float posePitch() {
+		return posePitch;
+	}
+
+	public float overlayFov() {
+		return cfg.overlayFov;
+	}
+
+	/** Called after every rendered frame. */
+	public void onFrameRendered() {
+		if (overlayActive()) {
+			frames.capture(Minecraft.getInstance());
+		}
+	}
+
+	/**
+	 * While overlaying, Minecraft's picture must be just the world: no HUD, no hand, no view
+	 * bobbing. The hand is skipped in GameRendererMixin. Restored afterwards.
+	 */
+	private void updateOverlay(Minecraft mc) {
+		boolean active = overlayActive();
+		if (active == overlayWasActive) {
+			return;
+		}
+		overlayWasActive = active;
+		if (active) {
+			savedHideGui = mc.gui.hud.isHidden();
+			savedBobView = mc.options.bobView().get();
+			if (!savedHideGui) {
+				mc.gui.hud.toggle();
+			}
+			mc.options.bobView().set(false);
+		} else {
+			if (mc.gui.hud.isHidden() != savedHideGui) {
+				mc.gui.hud.toggle();
+			}
+			mc.options.bobView().set(savedBobView);
 		}
 	}
 

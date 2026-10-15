@@ -16,17 +16,19 @@ namespace GorillaCraft
         private readonly string host;
         private readonly int port;
         private readonly Action<string> log;
+        private readonly Func<byte> helloFlags;
         private readonly ConcurrentQueue<object> inbound = new ConcurrentQueue<object>();
         private readonly BlockingCollection<byte[]> outbound = new BlockingCollection<byte[]>(new ConcurrentQueue<byte[]>());
         private volatile bool running = true;
         private volatile TcpClient client;
         private int generation;
 
-        public LinkClient(string host, int port, Action<string> log)
+        public LinkClient(string host, int port, Action<string> log, Func<byte> helloFlags)
         {
             this.host = host;
             this.port = port;
             this.log = log;
+            this.helloFlags = helloFlags;
         }
 
         public bool Connected => client != null;
@@ -76,7 +78,7 @@ namespace GorillaCraft
                 client = c;
                 Interlocked.Increment(ref generation);
                 inbound.Enqueue(new ConnectedEvent());
-                Send(new FrameWriter(Proto.GtHello).I32(Proto.Version).Str(Plugin.Version).Finish());
+                Send(new FrameWriter(Proto.GtHello).I32(Proto.Version).Str(Plugin.Version).U8(helloFlags()).Finish());
 
                 var writer = new Thread(() => WriteLoop(c)) { IsBackground = true, Name = "GorillaCraft link writer" };
                 writer.Start();

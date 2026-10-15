@@ -52,8 +52,12 @@ public final class SectionMesher {
 		}
 	}
 
-	/** @return the frame, or null when the section's chunk isn't loaded yet. */
-	public byte[] mesh(ClientLevel level, int sx, int sy, int sz) {
+	/**
+	 * @param renderQuads false when Gorilla Tag shows Minecraft's own picture (overlay mode) and
+	 *                    only needs collision and shapes.
+	 * @return the frame, or null when the section's chunk isn't loaded yet.
+	 */
+	public byte[] mesh(ClientLevel level, int sx, int sy, int sz, boolean renderQuads) {
 		LevelChunk chunk = level.getChunkSource().getChunk(sx, sz, ChunkStatus.FULL, false);
 		if (chunk == null) {
 			return null;
@@ -104,11 +108,11 @@ public final class SectionMesher {
 						pos.set(ox + lx, oy + ly, oz + lz);
 
 						FluidState fluid = state.getFluidState();
-						if (!fluid.isEmpty()) {
+						if (renderQuads && !fluid.isEmpty()) {
 							fluidRenderer.tesselate(level, pos, fluidOut, state, fluid);
 							fluidCapture.flush();
 						}
-						if (state.getRenderShape() == RenderShape.MODEL) {
+						if (renderQuads && state.getRenderShape() == RenderShape.MODEL) {
 							BlockQuadOutput out = ModelBlockRenderer.forceOpaque(true, state) ? forcedOpaque : byMaterial;
 							blockRenderer.tesselateBlock(out, lx, ly, lz, level, pos, state, models.get(state), state.getSeed(pos));
 						}

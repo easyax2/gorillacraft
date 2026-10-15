@@ -20,6 +20,8 @@ static class Program
     static Messages.Teleport teleport;
     static byte[] atlas;
     static Messages.Worlds worldsList;
+    static Messages.Frame frame;
+    static int frames;
     static int sectionUpdates;
     static readonly List<string> statuses = new();
     static int failures;
@@ -31,7 +33,7 @@ static class Program
         Console.WriteLine($"linktest: waiting for {Path.Combine(dir, "ready")}");
         WaitFor(() => File.Exists(Path.Combine(dir, "ready")), 600, "world ready");
 
-        link = new LinkClient("127.0.0.1", port, s => Console.WriteLine("link: " + s));
+        link = new LinkClient("127.0.0.1", port, s => Console.WriteLine("link: " + s), () => Proto.WantBlockMeshes | Proto.WantFrames);
         link.Start();
 
         WaitFor(() => world != null && world.HasWorld, 30, "WORLD");
@@ -55,6 +57,10 @@ static class Program
         Console.WriteLine($"teleport {teleport.Id} to {teleport.X:F2} {teleport.Y:F2} {teleport.Z:F2}");
         int ack = teleport.Id;
         for (int i = 0; i < 10; i++) { SendPose(true, ack, 0.5, -58.3, 0.5); Pump(50); }
+
+        // Overlay: Minecraft draws the gorilla's view and sends it back with depth.
+        WaitFor(() => frame != null, 15, "FRAME");
+        CheckFrame(frame);
 
         // Hotbar.
         WaitFor(() => hotbar != null, 10, "HOTBAR");
@@ -162,6 +168,7 @@ static class Program
                     case Messages.Hotbar h: hotbar = h; break;
                     case Messages.Status st: statuses.Add(st.Text); break;
                     case Messages.Worlds ws: worldsList = ws; break;
+                    case Messages.Frame fr: frame = fr; frames++; break;
                 }
             }
             Thread.Sleep(5);
@@ -180,6 +187,36 @@ static class Program
             }
             Pump(20);
         }
+    }
+
+    /// <summary>
+    /// The gorilla looks horizontally-ish (pitch 30 down) over flat ground from 1.7 blocks up:
+    /// bottom of the picture is ground below the camera, top is sky far away.
+    /// </summary>
+    static void CheckFrame(Messages.Frame f)
+    {
+        Console.WriteLine($"frame {f.Id}: {f.Width}x{f.Height} picture, {f.GridW}x{f.GridH} depth grid, camera {f.CamX:F2} {f.CamY:F2} {f.CamZ:F2}");
+        Check(f.Width >= 64 && f.Height >= 64 && f.Rgb.Length == f.Width * f.Height * 3, "picture has a sane size");
+        Check(Math.Abs(f.CamX - 0.5) < 0.01 && Math.Abs(f.CamY - (-58.3)) < 0.01 && Math.Abs(f.CamZ - 0.5) < 0.01, "camera is at the gorilla's head");
+        int mid = f.GridW / 2;
+        float[] P(int gx, int gy) { int o = (gy * f.GridW + gx) * 3; return new[] { f.Points[o], f.Points[o + 1], f.Points[o + 2] }; }
+        var bottom = P(mid, f.GridH - 1);
+        var top = P(mid, 0);
+        double topDist = Math.Sqrt(top[0] * top[0] + top[1] * top[1] + top[2] * top[2]);
+        Console.WriteLine($"  bottom-centre point {bottom[0]:F2} {bottom[1]:F2} {bottom[2]:F2}, top-centre distance {topDist:F0}");
+        Check(Math.Abs(bottom[1] - (-1.7)) < 0.15, "bottom of the picture is the ground, 1.7 blocks below the eyes");
+        Check(top[1] > 0 && topDist > 500, "top of the picture is sky, far away");
+        // Yaw 0 looks south (+Z in Minecraft), so the ground in view is at +Z.
+        Check(bottom[2] > 0.05, "the view faces the way the gorilla looks (south)");
+        // Ground row: mostly grass green.
+        int gr = 0, n = 0;
+        for (int x = 0; x < f.Width; x += 8)
+        {
+            int o = ((f.Height - 4) * f.Width + x) * 3;
+            n++;
+            if (f.Rgb[o + 1] > f.Rgb[o] && f.Rgb[o + 1] > f.Rgb[o + 2]) gr++;
+        }
+        Check(gr > n / 2, $"bottom row of the picture is green grass ({gr}/{n})");
     }
 
     static void Check(bool ok, string what)

@@ -73,6 +73,20 @@ namespace GorillaCraft
 
         public sealed class Status { public string Text; }
 
+        /// <summary>One picture from Minecraft's camera, with its depth as a grid of 3D points.</summary>
+        public sealed class Frame
+        {
+            public int Id;
+            /// <summary>Camera position the frame was drawn from (Minecraft coordinates).</summary>
+            public double CamX, CamY, CamZ;
+            public int Width, Height;
+            /// <summary>RGB, rows top to bottom.</summary>
+            public byte[] Rgb;
+            public int GridW, GridH;
+            /// <summary>xyz per grid point, relative to the camera (Minecraft axes), rows top to bottom.</summary>
+            public float[] Points;
+        }
+
         public static readonly Box FullCube = new Box { MaxX = 1, MaxY = 1, MaxZ = 1 };
 
         public static object Parse(byte type, FrameReader r)
@@ -115,6 +129,13 @@ namespace GorillaCraft
                     return h;
                 case Proto.McStatus:
                     return new Status { Text = r.Str() };
+                case Proto.McFrame:
+                    var f = new Frame { Id = r.I32(), CamX = r.F64(), CamY = r.F64(), CamZ = r.F64(), Width = r.I32(), Height = r.I32() };
+                    f.Rgb = r.Bytes(f.Width * f.Height * 3);
+                    f.GridW = r.I32();
+                    f.GridH = r.I32();
+                    f.Points = r.Floats(f.GridW * f.GridH * 3);
+                    return f;
                 default:
                     return null;
             }

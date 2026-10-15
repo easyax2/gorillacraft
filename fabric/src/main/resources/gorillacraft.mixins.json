@@ -3,7 +3,7 @@
 	"package": "dev.gorillacraft.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": ["PlayerMixin"],
-	"client": ["client.LevelExtractorMixin", "client.LocalPlayerMixin"],
+	"client": ["client.LevelExtractorMixin", "client.LocalPlayerMixin", "client.CameraMixin", "client.CameraAccess", "client.GameRendererMixin"],
 	"injectors": {
 		"defaultRequire": 1
 	}

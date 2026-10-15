@@ -20,6 +20,12 @@ public final class ClientConfig {
 	public int verticalRadius = 4;
 	/** Sections meshed and sent per client tick at most. */
 	public int sectionsPerTick = 6;
+	/** Overlay mode: width the picture sent to Gorilla Tag is scaled down to (at most). */
+	public int overlayWidth = 1280;
+	/** Overlay mode: depth grid columns (rows follow the window's shape). */
+	public int overlayGrid = 160;
+	/** Overlay mode: vertical field of view Minecraft renders with, in degrees. */
+	public int overlayFov = 110;
 
 	public static ClientConfig load() {
 		ClientConfig c = new ClientConfig();
@@ -40,6 +46,9 @@ public final class ClientConfig {
 		c.radius = Math.clamp(intProp(p, "radius", c.radius), 1, 16);
 		c.verticalRadius = Math.clamp(intProp(p, "verticalRadius", c.verticalRadius), 1, 24);
 		c.sectionsPerTick = Math.clamp(intProp(p, "sectionsPerTick", c.sectionsPerTick), 1, 64);
+		c.overlayWidth = Math.clamp(intProp(p, "overlayWidth", c.overlayWidth), 256, 4096);
+		c.overlayGrid = Math.clamp(intProp(p, "overlayGrid", c.overlayGrid), 16, 512);
+		c.overlayFov = Math.clamp(intProp(p, "overlayFov", c.overlayFov), 30, 150);
 		try (Writer w = Files.newBufferedWriter(file)) {
 			p.store(w, "GorillaCraft (Minecraft side). port must match Port in Gorilla Tag's BepInEx/config/dev.gorillacraft.cfg");
 		} catch (IOException e) {

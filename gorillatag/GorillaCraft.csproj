@@ -11,7 +11,7 @@
     <RootNamespace>GorillaCraft</RootNamespace>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <GamePath Condition="'$(GamePath)' == ''">$(HOME)/.local/share/Steam/steamapps/common/Gorilla Tag</GamePath>

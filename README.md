@@ -1,8 +1,9 @@
 # GorillaCraft
 
-Minecraft inside Gorilla Tag. You stay a gorilla (Gorilla Tag's arm locomotion, in VR), and a
-Minecraft world around you becomes a Gorilla Tag map: you climb Minecraft's blocks, punch them out
-with Minecraft's mining rules, and place blocks, open doors and flip levers with your hands.
+Minecraft inside Gorilla Tag. You stay a gorilla (Gorilla Tag's arm locomotion, in VR) and see
+Minecraft's own graphics around you: Minecraft draws the world from your gorilla head, and Gorilla
+Tag shows that picture in 3D around you. You climb Minecraft's blocks, punch them out with
+Minecraft's mining rules, and place blocks, open doors and flip levers with your hands.
 
 Modelled on [SkyCraft](https://github.com/RyanCraighead/SkyCraft) (Minecraft in Skyrim) and its
 rule that **neither game is rewritten**: Minecraft runs its own game in the background and does the
@@ -15,10 +16,15 @@ Tag features aren't in yet. This is interactions and maps only.
 
 ## What works
 
-- **Maps:** any Minecraft world, singleplayer or a server, shows up in Gorilla Tag. It's drawn
-  with Minecraft's own block models and textures (stairs, fences, leaves, water, biome colours,
-  smooth lighting), and its collision shapes are real Gorilla Tag colliders you can climb.
-  Blocks stream in around you as you move (4 chunks by default).
+- **Minecraft's real graphics (overlay):** Minecraft renders the view from your gorilla head
+  every frame (world, mobs, items, sky, day and night, weather, particles, lighting, resource
+  packs, shaders it supports). Gorilla Tag shows that picture on a 3D surface built from where
+  each part of it is, so it has real depth in VR, stays fixed in the world when you turn your
+  head, and gorillas and hands sort against it. Nothing is re-drawn by Gorilla Tag itself.
+- **Maps:** any Minecraft world, singleplayer or a server. Its collision shapes are real (but
+  invisible) Gorilla Tag colliders you can climb, streamed in around you (4 chunks by default).
+  The older mode, where Gorilla Tag draws Minecraft's block meshes itself, is still there as
+  `Rendering.Mode = Blocks`.
 - **Mining:** punch a block. Each punch keeps Minecraft mining it for a moment, so creative
   breaks in one hit and survival takes as many punches as Minecraft's break time. Tools and drops
   are Minecraft's. Optional fist mode: only punches with grip held count, so climbing never
@@ -76,10 +82,11 @@ Gorilla Tag: `BepInEx/config/dev.gorillacraft.cfg`
 | `Hands.PunchSpeed` / `PunchHold` / `FistMode` | `2.0` / `0.4` / `false` | What counts as a punch, how long each punch mines, fist mode |
 | `Menu.OpenAtStart` / `Servers` | `true` / | Show the menu at start; servers joined from it |
 | `Performance.SectionsPerFrame` | `4` | Mesh/collider builds per frame |
+| `Rendering.Mode` | `Overlay` | `Overlay`: Minecraft's picture in 3D. `Blocks`: Gorilla Tag draws block meshes itself |
 | `Rendering.Shader` | `Universal Render Pipeline/Particles/Unlit` | Block shader (falls back to `Sprites/Default`) |
 
 Minecraft: `config/gorillacraft.properties` (`port`, `radius` in chunks, `verticalRadius` in
-sections, `sectionsPerTick`).
+sections, `sectionsPerTick`, and for the overlay `overlayWidth`, `overlayGrid`, `overlayFov`).
 
 ## Known limitations
 
@@ -88,10 +95,13 @@ sections, `sectionsPerTick`).
   against Gorilla Tag. Expect tuning: `BlockScale`, `TouchDistance` and the wrist panel position.
 - Container screens (chests, furnaces, crafting tables) can't be shown in Gorilla Tag yet. They
   close straight away. Use the Minecraft window for your inventory.
-- Entities (mobs, items, other players) aren't drawn in Gorilla Tag yet, only blocks.
-- Lighting is baked as full daylight; Minecraft's night and weather aren't shown.
-- Block entities drawn by special renderers (chests, signs, banners, beds, heads) are invisible,
-  but you can still collide with and use them.
+- The overlay updates at Minecraft's frame rate (about 25–30 updates a second; the 3D surface
+  keeps head turning smooth in between). Fast movement shows edges where Minecraft hasn't drawn
+  yet, and things right next to edges can look smeared until the next frame.
+- Mobs and items are in the picture but flattened onto the wall behind them (depth comes from
+  blocks only).
+- The overlay needs Minecraft's window open (not minimised), and its window size is the overlay's
+  resolution.
 - If you die in Minecraft (survival), you respawn straight away.
 
 ## Building

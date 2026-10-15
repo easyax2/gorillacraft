@@ -132,6 +132,11 @@ namespace GorillaCraft
                 log.Append("created instance; ");
             }
 
+            // Overlay mode shows Minecraft's own picture, so its window size is the overlay's
+            // resolution: make it bigger than Minecraft's 854x480 default (once; the player may change it).
+            if (UpsertIni(cfg, "OverrideWindow", "true") | UpsertIni(cfg, "MinecraftWinWidth", "1600") | UpsertIni(cfg, "MinecraftWinHeight", "1000"))
+                log.Append("set window size for the overlay; ");
+
             string pack = Path.Combine(instance, "mmc-pack.json");
             if (!File.Exists(pack))
             {
@@ -185,6 +190,18 @@ namespace GorillaCraft
                 log.Append("installed ").Append(name).Append("; ");
             }
             return log.Length > 0 ? log.ToString().TrimEnd(' ', ';') : "up to date";
+        }
+
+        /// <summary>Adds key=value to the instance.cfg if the key isn't there yet.</summary>
+        private static bool UpsertIni(string file, string key, string value)
+        {
+            var lines = File.ReadAllLines(file).ToList();
+            if (lines.Any(l => l.StartsWith(key + "=")))
+                return false;
+            int general = lines.FindIndex(l => l.Trim() == "[General]");
+            lines.Insert(general >= 0 ? general + 1 : 0, key + "=" + value);
+            File.WriteAllLines(file, lines);
+            return true;
         }
 
         /// <summary>Starts the GorillaCraft instance (Windows). Prism forwards to an already-running Prism.</summary>
