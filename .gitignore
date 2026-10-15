@@ -1,0 +1,7 @@
+fabric/.gradle/
+fabric/build/
+fabric/run/
+gorillatag/bin/
+gorillatag/obj/
+tools/linktest/bin/
+tools/linktest/obj/

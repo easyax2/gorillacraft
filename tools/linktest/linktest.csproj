@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Stand-in for Gorilla Tag: the plugin's own Unity-free link and parsing code, driven by a script. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../gorillatag/src/Proto.cs" />
+    <Compile Include="../../gorillatag/src/Wire.cs" />
+    <Compile Include="../../gorillatag/src/LinkClient.cs" />
+    <Compile Include="../../gorillatag/src/Messages.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,10 @@
+{
+	"schemaVersion": 1,
+	"id": "gorillacraft-test",
+	"version": "1.0.0",
+	"name": "GorillaCraft tests",
+	"environment": "client",
+	"entrypoints": {
+		"fabric-client-gametest": ["dev.gorillacraft.test.GorillaLinkClientTest"]
+	}
+}
