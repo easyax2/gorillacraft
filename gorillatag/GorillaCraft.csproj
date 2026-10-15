@@ -11,17 +11,33 @@
     <RootNamespace>GorillaCraft</RootNamespace>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <GamePath Condition="'$(GamePath)' == ''">$(HOME)/.local/share/Steam/steamapps/common/Gorilla Tag</GamePath>
     <Managed>$(GamePath)/Gorilla Tag_Data/Managed</Managed>
     <BepInEx>$(GamePath)/BepInEx</BepInEx>
+    <!-- Jars the plugin installs into Prism Launcher (embedded in the dll). -->
+    <ModJar Condition="'$(ModJar)' == ''">$(MSBuildThisFileDirectory)../fabric/build/libs/gorillacraft-fabric-$(Version)+26.3.jar</ModJar>
+    <GradleHome Condition="'$(GradleHome)' == '' and '$(OS)' == 'Windows_NT'">$(USERPROFILE)/.gradle</GradleHome>
+    <GradleHome Condition="'$(GradleHome)' == ''">$(HOME)/.gradle</GradleHome>
+    <FabricApiVersion>0.161.0+26.3</FabricApiVersion>
   </PropertyGroup>
 
   <ItemGroup>
+    <FabricApiJar Include="$(FabricApiJar)" Condition="'$(FabricApiJar)' != ''" />
+    <FabricApiJar Include="$(GradleHome)/caches/modules-2/files-2.1/net.fabricmc.fabric-api/fabric-api/$(FabricApiVersion)/**/fabric-api-$(FabricApiVersion).jar" Condition="'$(FabricApiJar)' == ''" />
+    <EmbeddedResource Include="$(ModJar)" LogicalName="jar/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="@(FabricApiJar)" LogicalName="jar/%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <Target Name="CheckEmbeddedJars" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(ModJar)')" Text="Build the Minecraft mod first (cd fabric; gradlew build): $(ModJar) is missing." />
+    <Error Condition="'@(FabricApiJar)' == ''" Text="fabric-api-$(FabricApiVersion).jar not found. Build the Minecraft mod once (it downloads it) or pass -p:FabricApiJar=path." />
+  </Target>
+
+  <ItemGroup>
     <Reference Include="BepInEx"><HintPath>$(BepInEx)/core/BepInEx.dll</HintPath><Private>false</Private></Reference>
-    <Reference Include="Utilla"><HintPath>$(BepInEx)/plugins/Utilla.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Assembly-CSharp"><HintPath>$(Managed)/Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine"><HintPath>$(Managed)/UnityEngine.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(Managed)/UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>

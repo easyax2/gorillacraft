@@ -5,7 +5,6 @@ using BepInEx.Logging;
 using GorillaLocomotion;
 using UnityEngine;
 using UnityEngine.XR;
-using Utilla;
 
 namespace GorillaCraft
 {
@@ -13,16 +12,15 @@ namespace GorillaCraft
     /// Gorilla Tag half of GorillaCraft. Minecraft runs alongside (with the GorillaCraft Fabric
     /// mod) and owns the world; Gorilla Tag owns the gorilla. This plugin draws the Minecraft
     /// blocks around you as a Gorilla Tag map you can climb, and turns your hands into Minecraft
-    /// mining and clicking. Only active in modded lobbies.
+    /// mining and clicking. Only active where mods are fair: alone (not in a room), in private
+    /// rooms, and in modded lobbies (Utilla's, if it's installed). Never in public lobbies.
     /// </summary>
     [BepInPlugin(Guid, Name, Version)]
-    [BepInDependency("org.legoandmars.gorillatag.utilla")]
-    [ModdedGamemode]
     public sealed class Plugin : BaseUnityPlugin
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.1.0";
+        public const string Version = "0.2.0";
 
         internal static ManualLogSource Log;
 
@@ -34,6 +32,11 @@ namespace GorillaCraft
         private ConfigEntry<bool> autoEnter;
         private ConfigEntry<int> sectionsPerFrame;
         private ConfigEntry<string> shaderName;
+        private ConfigEntry<bool> autoInstall;
+        private ConfigEntry<bool> autoLaunch;
+        private ConfigEntry<string> prismPath;
+        private ConfigEntry<string> prismDataDir;
+        private ConfigEntry<string> worldName;
 
         private LinkClient link;
         private MinecraftWorld world;
@@ -43,8 +46,9 @@ namespace GorillaCraft
         private readonly Dictionary<(int, int, int), Messages.Section> pendingSections = new Dictionary<(int, int, int), Messages.Section>();
         private readonly List<(int, int, int)> applyOrder = new List<(int, int, int)>();
 
-        private bool inModdedRoom;
         private bool wantEnter;
+        private float launchCheckAt;
+        private bool launchChecked;
         private bool inMap;
         private bool sentInMap;
         private Vector3 returnPosition;
@@ -66,9 +70,16 @@ namespace GorillaCraft
                 "Where the Minecraft world's spawn point is placed in Gorilla Tag's world, far away from Gorilla Tag's own maps.");
             blockScale = Config.Bind("Map", "BlockScale", 1f, "Size of one Minecraft block in Gorilla Tag units (meters).");
             touchDistance = Config.Bind("Hands", "TouchDistance", 0.12f, "How close (in Gorilla Tag units) a hand must be to a block to mine or use it.");
-            autoEnter = Config.Bind("Map", "AutoEnter", true, "Enter the Minecraft map as soon as you join a modded lobby. Hold B+Y for a second to enter or leave by hand.");
+            autoEnter = Config.Bind("Map", "AutoEnter", true, "Enter the Minecraft map as soon as Minecraft is ready (alone, in a private room or in a modded lobby). Hold B+Y for a second to enter or leave by hand.");
             sectionsPerFrame = Config.Bind("Performance", "SectionsPerFrame", 4, "How many 16x16x16 block sections to build per frame.");
             shaderName = Config.Bind("Rendering", "Shader", "Universal Render Pipeline/Particles/Unlit", "Shader used for blocks.");
+            autoInstall = Config.Bind("Minecraft", "AutoInstall", true, "Create/update the GorillaCraft instance in Prism Launcher (Minecraft 26.3, Fabric, Fabric API, this mod) when Gorilla Tag starts.");
+            autoLaunch = Config.Bind("Minecraft", "AutoLaunch", true, "Start that instance through Prism Launcher if Minecraft isn't running (Windows only; on Linux use the Steam launch option from the guide).");
+            prismPath = Config.Bind("Minecraft", "PrismPath", "", "Full path to prismlauncher.exe. Empty: look in the usual install folders.");
+            prismDataDir = Config.Bind("Minecraft", "PrismDataDir", "", "Prism's data folder (the one with instances in it). Empty: the default one.");
+            worldName = Config.Bind("Minecraft", "World", "GorillaCraft", "Singleplayer world Minecraft opens by itself (created the first time). Only used when the instance is first created.");
+            wantEnter = autoEnter.Value;
+            launchCheckAt = Time.realtimeSinceStartup + 5f;
 
             link = new LinkClient(host.Value, port.Value, s => Log.LogInfo(s));
             link.Start();
@@ -79,20 +90,60 @@ namespace GorillaCraft
             link?.Dispose();
         }
 
-        [ModdedGamemodeJoin]
-        private void OnModdedJoin(string gamemode)
+        /// <summary>Alone, in a private room, or in a modded lobby. Never in public lobbies.</summary>
+        private static bool ModsAllowedHere()
         {
-            inModdedRoom = true;
-            wantEnter = autoEnter.Value;
+            NetworkSystem net = NetworkSystem.Instance;
+            if (net == null || !net.InRoom)
+                return true;
+            if (net.SessionIsPrivate)
+                return true;
+            return (net.GameModeString ?? "").IndexOf("MODDED", System.StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        [ModdedGamemodeLeave]
-        private void OnModdedLeave(string gamemode)
+        /// <summary>
+        /// A few seconds after start, if Minecraft hasn't connected: set up the Prism instance and
+        /// start it. Runs once.
+        /// </summary>
+        private void CheckMinecraft()
         {
-            inModdedRoom = false;
-            wantEnter = false;
-            if (inMap)
-                ExitMap(null);
+            if (launchChecked || Time.realtimeSinceStartup < launchCheckAt)
+                return;
+            launchChecked = true;
+            try
+            {
+                bool wine = PrismSetup.IsWine();
+                string exe = wine ? null : PrismSetup.FindExecutable(prismPath.Value);
+                string data = PrismSetup.FindDataDir(prismDataDir.Value, exe);
+                if (autoInstall.Value)
+                {
+                    if (data == null)
+                    {
+                        SetStatus("Prism Launcher not found. Install it and add your Microsoft account, then restart Gorilla Tag.");
+                        return;
+                    }
+                    Log.LogInfo($"Prism instance in {data}: {PrismSetup.Install(data, worldName.Value)}");
+                }
+                if (link.Connected || !autoLaunch.Value)
+                    return;
+                if (wine)
+                {
+                    SetStatus("Start the GorillaCraft instance in Prism (Linux: see the Steam launch option in the guide)");
+                    return;
+                }
+                if (exe == null)
+                {
+                    SetStatus("prismlauncher.exe not found. Set PrismPath in dev.gorillacraft.cfg.");
+                    return;
+                }
+                PrismSetup.Launch(exe, prismDataDir.Value);
+                SetStatus("Starting Minecraft through Prism Launcher...");
+            }
+            catch (System.Exception e)
+            {
+                Log.LogError("Setting up Minecraft failed: " + e);
+                SetStatus("Couldn't set up Minecraft: " + e.Message);
+            }
         }
 
         private bool EnsureSetUp()
@@ -136,8 +187,12 @@ namespace GorillaCraft
                 Handle(msg);
             ApplySections();
 
+            CheckMinecraft();
             UpdateToggle();
-            if (!inMap && wantEnter && inModdedRoom && link.Connected && world.HasWorld)
+            bool allowed = ModsAllowedHere();
+            if (inMap && !allowed)
+                ExitMap("GorillaCraft is off in public lobbies");
+            if (!inMap && wantEnter && allowed && link.Connected && world.HasWorld)
                 EnterMap();
 
             if (inMap)
@@ -250,8 +305,8 @@ namespace GorillaCraft
                     wantEnter = false;
                     ExitMap(null);
                 }
-                else if (!inModdedRoom)
-                    SetStatus("Join a modded lobby to play in Minecraft");
+                else if (!ModsAllowedHere())
+                    SetStatus("GorillaCraft is off in public lobbies: play alone, in a private room or a modded lobby");
                 else if (!link.Connected)
                     SetStatus("Start Minecraft with the GorillaCraft mod first");
                 else if (!world.HasWorld)

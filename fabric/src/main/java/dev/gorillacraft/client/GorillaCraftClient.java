@@ -23,5 +23,7 @@ public class GorillaCraftClient implements ClientModInitializer {
 		link.start();
 		session = new GorillaSession(link, cfg);
 		ClientTickEvents.END_CLIENT_TICK.register(session::tick);
+		AutoWorld autoWorld = new AutoWorld();
+		ClientTickEvents.END_CLIENT_TICK.register(autoWorld::tick);
 	}
 }

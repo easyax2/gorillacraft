@@ -34,21 +34,23 @@ Tag features aren't in yet. This is interactions and maps only.
 
 ## Requirements
 
-- Gorilla Tag (Steam/PC VR) with **BepInEx 5** and **Utilla**. GorillaCraft is only active in
-  **modded lobbies**, like any movement mod.
-- Minecraft: Java Edition **26.3** with **Fabric Loader 0.19.5+** and **Fabric API**, plus
-  `gorillacraft-fabric-0.1.0+26.3.jar`. Install the mod on the server too if you play on one.
+- Gorilla Tag (Steam/PC VR) with **BepInEx 5**. Utilla is optional. GorillaCraft is active alone
+  (before joining a room), in private rooms and in Utilla's modded lobbies, and switches itself
+  off in public lobbies.
+- **Prism Launcher** with your Microsoft account (owning Minecraft: Java Edition). The plugin
+  carries the Minecraft mod and Fabric API: it creates a **GorillaCraft** instance (Minecraft
+  26.3 + Fabric) in Prism, starts it (on Windows), and Minecraft opens its world by itself.
+- On a Minecraft server, install `gorillacraft-fabric-<version>+26.3.jar` and Fabric API too.
   Without it, the server may pull you back when you hug block edges.
 
 ## Playing
 
-1. Start Minecraft with the mod and open a world (or join a server). Creative is easiest for
-   building. Minecraft can sit in the background; it doesn't pause when it loses focus while
-   Gorilla Tag is connected.
-2. Start Gorilla Tag and join a modded lobby (Utilla's modded gamemodes, or a private code with a
-   modded mode).
-3. You're dropped into the Minecraft world where your Minecraft player stands. Hold **B + Y**
-   for a second to leave the map or go back in. Leaving the lobby takes you back too.
+1. Start Gorilla Tag. After a few seconds GorillaCraft sets up and starts Minecraft through
+   Prism (the first time, Prism downloads Minecraft). Minecraft opens a creative world called
+   GorillaCraft. It can sit in the background; it doesn't pause while Gorilla Tag is connected.
+   On Linux/Proton, start the instance yourself or with a Steam launch option (see the guide).
+2. You're dropped into the Minecraft world where your Minecraft player stands. Hold **B + Y**
+   for a second to leave the map or go back in. Play with others in a private room.
 
 Tip: lower Minecraft's max framerate (or minimise it) so your VR game gets the GPU.
 
@@ -61,7 +63,9 @@ Gorilla Tag: `BepInEx/config/dev.gorillacraft.cfg`
 | `Link.Host` / `Link.Port` | `127.0.0.1` / `47123` | Where Minecraft listens |
 | `Map.Anchor` | `0, 1500, 0` | Where Minecraft's spawn point sits in Gorilla Tag's world, far from Gorilla Tag's own maps |
 | `Map.BlockScale` | `1` | Size of a block in Gorilla Tag units (meters) |
-| `Map.AutoEnter` | `true` | Enter the map when you join a modded lobby |
+| `Map.AutoEnter` | `true` | Enter the map as soon as Minecraft is ready |
+| `Minecraft.AutoInstall` / `AutoLaunch` | `true` / `true` | Set up / start the GorillaCraft Prism instance |
+| `Minecraft.PrismPath` / `PrismDataDir` / `World` | | Where Prism is, and which world opens |
 | `Hands.TouchDistance` | `0.12` | How close a hand must be to a block to mine or use it |
 | `Performance.SectionsPerFrame` | `4` | Mesh/collider builds per frame |
 | `Rendering.Shader` | `Universal Render Pipeline/Particles/Unlit` | Block shader (falls back to `Sprites/Default`) |
@@ -86,7 +90,7 @@ sections, `sectionsPerTick`).
 
 ```bash
 cd fabric && ./gradlew build                              # → fabric/build/libs/gorillacraft-fabric-*.jar
-cd gorillatag && dotnet build -c Release                  # → gorillatag/bin/Release/GorillaCraft.dll
+cd gorillatag && dotnet build -c Release                  # → gorillatag/bin/Release/GorillaCraft.dll (embeds the jar above + Fabric API)
 cd gorillatag && dotnet build -c Release -p:Deploy=true   # also copies it to BepInEx/plugins/GorillaCraft
 ```
 
