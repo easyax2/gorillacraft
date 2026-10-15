@@ -20,7 +20,7 @@ namespace GorillaCraft
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.7.0";
+        public const string Version = "0.7.1";
 
         internal static ManualLogSource Log;
 
@@ -58,6 +58,7 @@ namespace GorillaCraft
         private SharedFrames shared;
         private HeldItemView held;
         private ConfigEntry<bool> swapEyes;
+        private ConfigEntry<bool> cutEdges;
         private float yDownAt = -1f;
         private bool yDown;
         private readonly Messages.Frame[] latestFrames = new Messages.Frame[3]; // newest per eye
@@ -103,6 +104,7 @@ namespace GorillaCraft
             perEye = Config.Bind("Rendering", "PerEye", true,
                 "Overlay: Minecraft draws each eye's view separately (left and right take turns), and Gorilla Tag renders the eyes " +
                 "one after the other so each sees its own picture. Off: one picture from the middle of your head for both eyes (lighter). Restart after changing.");
+            cutEdges = Config.Bind("Rendering", "CutEdges", true, "Overlay: cut the picture at depth edges and fill the gap from the other eye, instead of stretching it (which smears when you move).");
             swapEyes = Config.Bind("Rendering", "SwapEyes", false, "Show each eye the other eye's Minecraft picture. Only if the 3D looks inside out.");
             if (OverlayMode && perEye.Value)
                 ForceMultiPass();
@@ -132,6 +134,7 @@ namespace GorillaCraft
                 new MainMenu.Setting { Name = "Fist mode (punch with grip, use with trigger)", Value = () => OnOff(fistMode.Value), Change = d => fistMode.Value = !fistMode.Value },
                 new MainMenu.Setting { Name = "Punch speed", Value = () => punchSpeed.Value.ToString("0.0") + " m/s", Change = d => punchSpeed.Value = Mathf.Clamp(punchSpeed.Value + 0.2f * d, 0.2f, 6f) },
                 new MainMenu.Setting { Name = "Mining per punch", Value = () => punchHold.Value.ToString("0.00") + " s", Change = d => punchHold.Value = Mathf.Clamp(punchHold.Value + 0.05f * d, 0.05f, 2f) },
+                new MainMenu.Setting { Name = "Cut picture at edges (less smearing)", Value = () => OnOff(cutEdges.Value), Change = d => cutEdges.Value = !cutEdges.Value },
                 new MainMenu.Setting { Name = "Swap eyes (if 3D looks inside out)", Value = () => OnOff(swapEyes.Value), Change = d => swapEyes.Value = !swapEyes.Value },
                 new MainMenu.Setting { Name = "Hand reach", Value = () => touchDistance.Value.ToString("0.00") + " m", Change = d => touchDistance.Value = Mathf.Clamp(touchDistance.Value + 0.02f * d, 0.02f, 0.5f) },
                 new MainMenu.Setting { Name = "Block size (after restart)", Value = () => blockScale.Value.ToString("0.0#") + " m", Change = d => blockScale.Value = Mathf.Clamp(blockScale.Value + 0.1f * d, 0.2f, 3f) },
@@ -200,6 +203,41 @@ namespace GorillaCraft
             {
                 Log.LogWarning("Couldn't set OpenXR stereo mode: " + e.Message);
             }
+        }
+
+        private static Camera headCamera;
+        private static string loggedHead;
+
+        /// <summary>
+        /// The camera that is your headset: the one rendering in stereo. Not GTPlayer.mainCamera
+        /// (that's Camera.main, which can be Gorilla Tag's desktop/third-person camera, above and
+        /// behind the gorilla), not the shoulder camera.
+        /// </summary>
+        internal static Camera HeadCamera()
+        {
+            if (headCamera == null || !headCamera.isActiveAndEnabled || !headCamera.stereoEnabled)
+            {
+                headCamera = null;
+                foreach (Camera c in Camera.allCameras)
+                {
+                    if (c.stereoEnabled && c.targetTexture == null)
+                    {
+                        headCamera = c;
+                        break;
+                    }
+                }
+                if (headCamera == null && GorillaTagger.Instance != null && GorillaTagger.Instance.mainCamera != null)
+                    headCamera = GorillaTagger.Instance.mainCamera.GetComponent<Camera>();
+                if (headCamera == null && GTPlayer.Instance != null)
+                    headCamera = GTPlayer.Instance.mainCamera;
+                string name = headCamera != null ? headCamera.name + (headCamera.stereoEnabled ? " (stereo)" : " (not stereo)") : "head collider";
+                if (name != loggedHead)
+                {
+                    loggedHead = name;
+                    Log.LogInfo("Minecraft's camera follows " + name);
+                }
+            }
+            return headCamera;
         }
 
         /// <summary>Where each eye is, in Unity world space: from the XR eye poses, or head ± half the eye distance.</summary>
@@ -372,6 +410,7 @@ namespace GorillaCraft
             hands.fistMode = fistMode.Value;
             if (overlay != null)
                 overlay.SwapEyes = swapEyes.Value;
+            OverlayView.CutEdges = cutEdges.Value;
             if (inMap)
             {
                 UpdateHold();
@@ -539,7 +578,7 @@ namespace GorillaCraft
         private void EnterMap()
         {
             GTPlayer player = GTPlayer.Instance;
-            returnPosition = player.mainCamera.transform.position;
+            returnPosition = (HeadCamera() != null ? HeadCamera().transform : player.headCollider.transform).position;
             inMap = true;
             world.Visible = true;
             if (overlay != null)
@@ -603,11 +642,12 @@ namespace GorillaCraft
             sentInMap = inMap;
 
             GTPlayer player = GTPlayer.Instance;
-            Transform cam = player.mainCamera != null ? player.mainCamera.transform : player.headCollider.transform;
+            Camera headCam = HeadCamera();
+            Transform cam = headCam != null ? headCam.transform : player.headCollider.transform;
             Vector3 head = holding ? holdPosition : cam.position;
             world.Coords.ToMinecraft(head, out double x, out double y, out double z);
             Coords.LookAngles(cam.forward, out float yaw, out float pitch);
-            EyePositions(player.mainCamera, out Vector3 leftEye, out Vector3 rightEye);
+            EyePositions(headCam, out Vector3 leftEye, out Vector3 rightEye);
             if (holding)
             {
                 Vector3 offset = holdPosition - cam.position;

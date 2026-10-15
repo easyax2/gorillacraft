@@ -18,8 +18,11 @@ namespace GorillaCraft
     /// eyes are rendered together anyway (single-pass), or in the desktop view, one picture is
     /// used for both.
     ///
-    /// Every cell of the grid is drawn: seen from where Minecraft drew it, the surface shows
-    /// exactly Minecraft's pixels.
+    /// Cells that span a real depth edge (a block in front of something far away, or against the
+    /// sky) are cut, instead of being stretched into a "curtain" that smears as soon as the eye
+    /// moves. Flat surfaces seen at a low angle and block corners have no real jump and stay. The
+    /// gaps left at edges are filled with the other eye's picture, drawn just behind: it saw a
+    /// little further round the edge.
     /// </summary>
     public sealed class OverlayView
     {
@@ -143,6 +146,9 @@ namespace GorillaCraft
             return s;
         }
 
+        /// <summary>Cut cells at depth edges (see the class comment). Off: draw every cell.</summary>
+        public static bool CutEdges = true;
+
         private static void Finish(Surface s, float[] points, double camX, double camY, double camZ, Coords coords)
         {
             // Points are relative to the camera Minecraft drew from, so floats stay small.
@@ -150,9 +156,47 @@ namespace GorillaCraft
             for (int i = 0; i < n; i++)
                 s.Vertices[i] = new Vector3(points[i * 3], points[i * 3 + 1], -points[i * 3 + 2]); // flip Z
             s.Mesh.vertices = s.Vertices;
+            s.Triangles.Clear();
+            for (int y = 0; y < s.GridH - 1; y++)
+            {
+                for (int x = 0; x < s.GridW - 1; x++)
+                {
+                    int a = y * s.GridW + x, b = a + 1, c = a + s.GridW, d = c + 1;
+                    if (CutEdges && !Continuous(s.Vertices, a, b, c, d))
+                        continue;
+                    s.Triangles.Add(a); s.Triangles.Add(b); s.Triangles.Add(c);
+                    s.Triangles.Add(b); s.Triangles.Add(d); s.Triangles.Add(c);
+                }
+            }
+            s.Mesh.SetTriangles(s.Triangles, 0, false);
             s.Mesh.RecalculateBounds();
             s.LocalToWorld = Matrix4x4.TRS(coords.ToUnity(camX, camY, camZ), Quaternion.identity, Vector3.one * coords.Scale);
             s.HasFrame = true;
+        }
+
+        private const float Sky = 290f; // Minecraft puts sky points 300 blocks out
+
+        /// <summary>
+        /// Whether a cell's four corners are one surface. A real edge is a big jump in distance
+        /// whose corners don't lie on one plane; a floor seen at a low angle has a big jump too,
+        /// but stays flat.
+        /// </summary>
+        private static bool Continuous(Vector3[] v, int a, int b, int c, int d)
+        {
+            float da = v[a].magnitude, db = v[b].magnitude, dc = v[c].magnitude, dd = v[d].magnitude;
+            bool sa = da > Sky, sb = db > Sky, sc = dc > Sky, sd = dd > Sky;
+            if (sa || sb || sc || sd)
+                return sa && sb && sc && sd; // all sky; a silhouette against the sky is an edge
+            float min = Mathf.Min(Mathf.Min(da, db), Mathf.Min(dc, dd));
+            float max = Mathf.Max(Mathf.Max(da, db), Mathf.Max(dc, dd));
+            if (max <= min * 1.08f + 0.05f)
+                return true;
+            Vector3 normal = Vector3.Cross(v[b] - v[a], v[c] - v[a]);
+            float len = normal.magnitude;
+            if (len < 1e-8f)
+                return false;
+            float off = Mathf.Abs(Vector3.Dot(v[d] - v[a], normal / len));
+            return off < 0.02f * min + 0.03f;
         }
 
         /// <summary>The surface for one eye (0 left, 1 right), or the best stand-in when that one has no picture yet.</summary>
@@ -178,6 +222,9 @@ namespace GorillaCraft
                 public Mesh Mesh;
                 public Material Material;
                 public Matrix4x4 Matrix;
+                public Mesh FillMesh;
+                public Material FillMaterial;
+                public Matrix4x4 FillMatrix;
             }
 
             public EyePass(OverlayView view)
@@ -200,15 +247,31 @@ namespace GorillaCraft
                 Surface s = view.For(eye);
                 if (s == null)
                     return;
+                // The other eye's picture fills the gaps at edges, pushed 1% further from its camera
+                // so this eye's own picture wins wherever both have something.
+                Surface fill = eye == 0 || eye == 1 ? view.surfaces[1 - eye] : null;
+                if (fill != null && (!fill.HasFrame || fill == s || !CutEdges))
+                    fill = null;
                 using (var builder = renderGraph.AddRasterRenderPass<PassData>("GorillaCraft Minecraft view", out var data))
                 {
                     data.Mesh = s.Mesh;
                     data.Material = s.Material;
                     data.Matrix = s.LocalToWorld;
+                    if (fill != null)
+                    {
+                        data.FillMesh = fill.Mesh;
+                        data.FillMaterial = fill.Material;
+                        data.FillMatrix = fill.LocalToWorld * Matrix4x4.Scale(Vector3.one * 1.01f);
+                    }
                     builder.SetRenderAttachment(resources.activeColorTexture, 0, AccessFlags.Write);
                     builder.SetRenderAttachmentDepth(resources.activeDepthTexture, AccessFlags.ReadWrite);
                     builder.AllowPassCulling(false);
-                    builder.SetRenderFunc((PassData d, RasterGraphContext ctx) => ctx.cmd.DrawMesh(d.Mesh, d.Matrix, d.Material, 0, 0));
+                    builder.SetRenderFunc((PassData d, RasterGraphContext ctx) =>
+                    {
+                        if (d.FillMesh != null)
+                            ctx.cmd.DrawMesh(d.FillMesh, d.FillMatrix, d.FillMaterial, 0, 0);
+                        ctx.cmd.DrawMesh(d.Mesh, d.Matrix, d.Material, 0, 0);
+                    });
                 }
             }
         }

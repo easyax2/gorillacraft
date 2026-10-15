@@ -275,6 +275,24 @@ static class Program
         double topDist = Math.Sqrt(top[0] * top[0] + top[1] * top[1] + top[2] * top[2]);
         Console.WriteLine($"  bottom-centre point {bottom[0]:F2} {bottom[1]:F2} {bottom[2]:F2}, top-centre distance {topDist:F0}");
         Check(Math.Abs(bottom[1] - (-1.7)) < 0.15, "bottom of the picture is the ground, 1.7 blocks below the eyes");
+        // Edge cutting (same test as OverlayView.Continuous): flat ground must stay whole; only the
+        // horizon (ground against sky) is an edge.
+        int groundCells = 0, groundCut = 0, skyEdge = 0;
+        for (int y = 0; y < f.GridH - 1; y++)
+            for (int x = 0; x < f.GridW - 1; x++)
+            {
+                int ia = y * f.GridW + x, ib = ia + 1, ic = ia + f.GridW, id = ic + 1;
+                var pa = P(ia % f.GridW, ia / f.GridW); var pb = P(ib % f.GridW, ib / f.GridW);
+                var pc = P(ic % f.GridW, ic / f.GridW); var pd = P(id % f.GridW, id / f.GridW);
+                bool anySky = new[] { pa, pb, pc, pd }.Any(q => Len(q) > 290);
+                bool allSky = new[] { pa, pb, pc, pd }.All(q => Len(q) > 290);
+                if (allSky) continue;
+                if (anySky) { skyEdge++; continue; }
+                groundCells++;
+                if (!Continuous(pa, pb, pc, pd)) groundCut++;
+            }
+        Console.WriteLine($"  edges: {groundCut} of {groundCells} ground cells cut, {skyEdge} horizon cells");
+        Check(groundCut <= groundCells / 100, "flat ground isn't cut (only real edges are)");
         Check(top[1] > 0 && topDist > 250, "top of the picture is sky, far away");
         // Yaw 0 looks south (+Z in Minecraft), so the ground in view is at +Z.
         Check(bottom[2] > 0.05, "the view faces the way the gorilla looks (south)");
@@ -287,6 +305,21 @@ static class Program
             if (f.Rgba[o + 1] > f.Rgba[o] && f.Rgba[o + 1] > f.Rgba[o + 2]) gr++;
         }
         Check(gr > n / 2, $"bottom row of the picture is green grass ({gr}/{n})");
+    }
+
+    static double Len(float[] p) => Math.Sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]);
+
+    static bool Continuous(float[] a, float[] b, float[] c, float[] d)
+    {
+        double da = Len(a), db = Len(b), dc = Len(c), dd = Len(d);
+        double min = Math.Min(Math.Min(da, db), Math.Min(dc, dd)), max = Math.Max(Math.Max(da, db), Math.Max(dc, dd));
+        if (max <= min * 1.08 + 0.05) return true;
+        double[] u = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, v = { c[0] - a[0], c[1] - a[1], c[2] - a[2] };
+        double[] n = { u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0] };
+        double len = Math.Sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+        if (len < 1e-8) return false;
+        double off = Math.Abs(((d[0] - a[0]) * n[0] + (d[1] - a[1]) * n[1] + (d[2] - a[2]) * n[2]) / len);
+        return off < 0.02 * min + 0.03;
     }
 
     static void Check(bool ok, string what)

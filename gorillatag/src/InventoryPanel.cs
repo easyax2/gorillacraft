@@ -150,7 +150,8 @@ namespace GorillaCraft
                 return;
             placed = true;
             GTPlayer player = GTPlayer.Instance;
-            Transform head = player.mainCamera != null ? player.mainCamera.transform : player.headCollider.transform;
+            Camera headCam = Plugin.HeadCamera();
+            Transform head = headCam != null ? headCam.transform : player.headCollider.transform;
             float scale = head.parent != null ? head.parent.lossyScale.x : 1f;
             Vector3 forward = Vector3.ProjectOnPlane(head.forward, Vector3.up).normalized;
             if (forward.sqrMagnitude < 0.01f)
