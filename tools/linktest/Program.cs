@@ -22,6 +22,8 @@ static class Program
     static Messages.Worlds worldsList;
     static Messages.Frame frame;
     static Messages.GuiFrame guiFrame;
+    static SharedFrames shared;
+    static int sharedFrames;
     static Messages.Held held;
     static readonly Messages.Frame[] eyeFrames = new Messages.Frame[3];
     static int frames;
@@ -36,7 +38,7 @@ static class Program
         Console.WriteLine($"linktest: waiting for {Path.Combine(dir, "ready")}");
         WaitFor(() => File.Exists(Path.Combine(dir, "ready")), 600, "world ready");
 
-        link = new LinkClient("127.0.0.1", port, s => Console.WriteLine("link: " + s), () => Proto.WantBlockMeshes | Proto.WantFrames | Proto.WantStereo);
+        link = new LinkClient("127.0.0.1", port, s => Console.WriteLine("link: " + s), () => Proto.WantBlockMeshes | Proto.WantFrames | Proto.WantStereo | Proto.WantShm);
         link.Start();
 
         WaitFor(() => world != null && world.HasWorld, 30, "WORLD");
@@ -65,6 +67,9 @@ static class Program
         WaitFor(() => eyeFrames[0] != null && eyeFrames[1] != null, 15, "FRAMEs for both eyes");
         Check(Math.Abs(eyeFrames[0].CamX - 0.532) < 0.001 && Math.Abs(eyeFrames[1].CamX - 0.468) < 0.001, "left and right frames are drawn from each eye");
         CheckFrame(eyeFrames[0]);
+        int framesBefore = frames;
+        for (int i = 0; i < 60; i++) { SendPose(true, ack, 0.5, -58.3, 0.5); Pump(50); }
+        Console.WriteLine($"overlay rate: {(frames - framesBefore) / 3.0:F0} frames/s ({eyeFrames[0].Width}x{eyeFrames[0].Height}, both eyes together)");
 
         // Hotbar.
         WaitFor(() => hotbar != null, 10, "HOTBAR");
@@ -155,6 +160,8 @@ static class Program
         Console.WriteLine("worlds: " + string.Join(", ", worldsList.Names));
         Check(Array.IndexOf(worldsList.Ids, "LinkTestWorld") >= 0, "world list has the new world");
 
+        Console.WriteLine($"{frames} overlay frames, {sharedFrames} of them through shared memory");
+        Check(shared != null && sharedFrames > 0, "frames come through shared memory");
         Console.WriteLine("statuses: " + string.Join(" | ", statuses));
         File.WriteAllText(Path.Combine(dir, "done-all"), "");
         Pump(500);
@@ -193,11 +200,49 @@ static class Program
                     case Messages.Worlds ws: worldsList = ws; break;
                     case Messages.GuiFrame gf: guiFrame = gf; break;
                     case Messages.Held hd: held = hd; break;
+                    case Messages.Shm shm:
+                        shared = SharedFrames.Open(shm.Path, shm.Size, s => Console.WriteLine("shm: " + s));
+                        Console.WriteLine($"shared frames {shm.Path}: {(shared != null ? "mapped" : "NOT mapped")}");
+                        link.Send(new FrameWriter(Proto.GtShm).U8(shared != null ? 1 : 0).Finish());
+                        break;
                     case Messages.Frame fr: frame = fr; eyeFrames[Math.Clamp(fr.Eye, 0, 2)] = fr; frames++; break;
                 }
             }
+            if (shared != null)
+            {
+                for (int b = 0; b < 3; b++)
+                    if (shared.TryTake(b, out var sl) && sl.Width > 0)
+                    {
+                        var fr = FromShared(sl);
+                        frame = fr;
+                        eyeFrames[Math.Clamp(fr.Eye, 0, 2)] = fr;
+                        frames++;
+                        sharedFrames++;
+                    }
+                if (shared.TryTake(SharedFrames.Gui, out var g))
+                    guiFrame = new Messages.GuiFrame { Width = g.Width, Height = g.Height, Rgba = g.Width > 0 ? TopDown(g) : null };
+            }
             Thread.Sleep(5);
         } while (DateTime.UtcNow < until);
+    }
+
+    /// <summary>A shared-memory picture as a socket-style frame (rows top-down), for the same checks.</summary>
+    static Messages.Frame FromShared(SharedFrames.Slot s)
+    {
+        var f = new Messages.Frame { Id = (int)s.FrameId, Eye = s.Eye, CamX = s.CamX, CamY = s.CamY, CamZ = s.CamZ, Width = s.Width, Height = s.Height, GridW = s.GridW, GridH = s.GridH };
+        f.Rgba = TopDown(s);
+        f.Points = new float[s.GridW * s.GridH * 3];
+        System.Runtime.InteropServices.Marshal.Copy(s.Points, f.Points, 0, f.Points.Length);
+        return f;
+    }
+
+    static byte[] TopDown(SharedFrames.Slot s)
+    {
+        var rgba = new byte[s.Width * s.Height * 4];
+        int row = s.Width * 4;
+        for (int y = 0; y < s.Height; y++)
+            System.Runtime.InteropServices.Marshal.Copy(s.Pixels + (s.BottomUp ? s.Height - 1 - y : y) * row, rgba, y * row, row);
+        return rgba;
     }
 
     static void WaitFor(Func<bool> cond, int seconds, string what)

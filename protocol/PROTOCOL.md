@@ -1,4 +1,4 @@
-# GorillaCraft link protocol (version 5)
+# GorillaCraft link protocol (version 6)
 
 Loopback TCP. Minecraft listens on `127.0.0.1:47123` (configurable), Gorilla Tag connects and
 reconnects as needed. One Gorilla Tag at a time; a new connection replaces the old one.
@@ -19,7 +19,7 @@ Faces use Minecraft's `Direction` 3D data value: 0 down, 1 up, 2 north, 3 south,
 
 | Type | Name | Payload |
 |---|---|---|
-| 0x01 | HELLO | `i32 protocolVersion, str pluginVersion, u8 wants` — bit 1: block meshes (and the atlas), bit 2: overlay frames, bit 4: per-eye frames (alternating left/right). Collision and shapes are always sent. |
+| 0x01 | HELLO | `i32 protocolVersion, str pluginVersion, u8 wants` — bit 1: block meshes (and the atlas), bit 2: overlay frames, bit 4: per-eye frames (alternating left/right), bit 8: frames through shared memory. Collision and shapes are always sent. |
 | 0x02 | POSE | `u8 inMap, i32 teleportAck, f64 x, f64 y, f64 z (eyes), f32 yaw, f32 pitch, f64 leftEye xyz, f64 rightEye xyz` — ~50 Hz while in the map, and on every inMap change |
 | 0x03 | MINE | `u8 active, i32 x, i32 y, i32 z, u8 face` — sent when the mined block/face changes or mining stops |
 | 0x04 | USE | `i32 x, i32 y, i32 z, u8 face, f64 hitX, f64 hitY, f64 hitZ` — one right-click on that block |
@@ -31,6 +31,7 @@ Faces use Minecraft's `Direction` 3D data value: 0 down, 1 up, 2 north, 3 south,
 | 0x0A | INVENTORY | `u8 open` — open the inventory, or (0) close whatever screen is open |
 | 0x0B | POINTER | `f32 u, f32 v (0..1 across Minecraft's window, from the top left), u8 buttons (bit 0 left, bit 1 right)` |
 | 0x0C | SCROLL | `f32 amount` |
+| 0x0D | SHM | `u8 ok` — whether Gorilla Tag could map the shared frame memory offered with MC SHM |
 
 ## Minecraft → Gorilla Tag
 
@@ -46,6 +47,7 @@ Faces use Minecraft's `Direction` 3D data value: 0 down, 1 up, 2 north, 3 south,
 | 0x88 | STATUS | `str text` |
 | 0x8A | FRAME | overlay picture, see below |
 | 0x8B | GUI_FRAME | `i32 width, height`, then width × height × RGBA: Minecraft's whole window while a screen is open; 0 × 0 = closed |
+| 0x8D | SHM | `str path, f64 size` — the shared frame memory file (Minecraft's own path) |
 | 0x8C | HELD | `u8 kind (0 nothing, 1 item, 2 block), i32 length, PNG` — the held item's texture |
 | 0x89 | WORLDS | `i32 n`, then n × `str id, str name` — singleplayer worlds, most recently played first (not the one that's open) |
 
@@ -85,6 +87,20 @@ gridW × gridH × (f32 x, y, z)  where each grid point of the picture is, relati
 Grid points are ray casts from the camera through the picture into Minecraft's blocks (visual
 shapes and fluids), so they match the picture except for entities. Gorilla Tag stretches the
 picture over the grid.
+
+### Shared frame memory
+
+Like SkyCraft's overlay: when Gorilla Tag asks for it (HELLO bit 8) Minecraft creates a file in
+`/dev/shm` (Linux) or the temp folder (Windows), offers it with MC SHM, and once Gorilla Tag
+answers SHM ok, FRAME and GUI_FRAME pictures go there instead of the socket. Gorilla Tag under
+Proton reaches a Linux path through the `Z:` drive. If mapping fails, everything stays on the
+socket.
+
+The file holds four lock-free triple buffers (left eye, right eye, centre, GUI panel). Minecraft
+copies a finished GPU readback into its private slot with one memcpy (rows bottom-up, as the GPU
+left them), then swaps it in with an atomic exchange; Gorilla Tag swaps the newest one out the
+same way and hands it to Unity straight from the shared memory. Layout:
+`fabric/src/main/java/dev/gorillacraft/link/SharedFrames.java` and `gorillatag/src/SharedFrames.cs`.
 
 ## Teleports
 

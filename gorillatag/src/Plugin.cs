@@ -20,7 +20,7 @@ namespace GorillaCraft
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.6.0";
+        public const string Version = "0.7.0";
 
         internal static ManualLogSource Log;
 
@@ -55,6 +55,7 @@ namespace GorillaCraft
         private OverlayView overlay;
         private readonly GorillaOnlyView gorillaOnly = new GorillaOnlyView();
         private InventoryPanel inventory;
+        private SharedFrames shared;
         private HeldItemView held;
         private ConfigEntry<bool> swapEyes;
         private float yDownAt = -1f;
@@ -118,7 +119,7 @@ namespace GorillaCraft
             launchCheckAt = Time.realtimeSinceStartup + 5f;
 
             link = new LinkClient(host.Value, port.Value, s => Log.LogInfo(s),
-                () => OverlayMode ? (byte)(Proto.WantFrames | (perEye.Value ? Proto.WantStereo : 0)) : Proto.WantBlockMeshes);
+                () => OverlayMode ? (byte)(Proto.WantFrames | Proto.WantShm | (perEye.Value ? Proto.WantStereo : 0)) : (byte)(Proto.WantBlockMeshes | Proto.WantShm));
             link.Start();
         }
 
@@ -220,6 +221,7 @@ namespace GorillaCraft
 
         private void OnDestroy()
         {
+            shared?.Dispose();
             gorillaOnly.Disable();
             link?.Dispose();
         }
@@ -330,6 +332,15 @@ namespace GorillaCraft
             }
             ApplySections();
             gorillaOnly.Update();
+            if (shared != null)
+            {
+                // SkyCraft-style: the newest picture per stream, straight from shared memory.
+                for (int b = 0; b < 3; b++)
+                    if (shared.TryTake(b, out SharedFrames.Slot slot) && overlay != null && inMap)
+                        overlay.Show(slot, world.Coords);
+                if (shared.TryTake(SharedFrames.Gui, out SharedFrames.Slot gui) && (inMap || gui.Width == 0))
+                    inventory.Show(gui);
+            }
             for (int e = 0; e < latestFrames.Length; e++)
             {
                 Messages.Frame frame = latestFrames[e];
@@ -387,6 +398,8 @@ namespace GorillaCraft
                     sentInMap = !inMap; // force a pose message with the current state
                     break;
                 case LinkClient.DisconnectedEvent _:
+                    shared?.Dispose();
+                    shared = null;
                     wrist.SetConnected(false);
                     if (inMap)
                         ExitMap("Lost connection to Minecraft");
@@ -424,6 +437,13 @@ namespace GorillaCraft
                 case Messages.Hotbar h:
                     hands.SelectedSlot = h.Selected;
                     wrist.SetHotbar(h);
+                    break;
+                case Messages.Shm shm:
+                    shared?.Dispose();
+                    shared = SharedFrames.Open(shm.Path, shm.Size, s => Log.LogWarning(s));
+                    if (shared != null)
+                        Log.LogInfo("Minecraft's frames come through shared memory: " + shm.Path);
+                    link.Send(new FrameWriter(Proto.GtShm).U8(shared != null ? 1 : 0).Finish());
                     break;
                 case Messages.GuiFrame gf:
                     if (inMap || gf.Width == 0)

@@ -6,7 +6,7 @@ package dev.gorillacraft.link;
  * length counts the type byte and the payload.
  */
 public final class Proto {
-	public static final int VERSION = 5;
+	public static final int VERSION = 6;
 	public static final int MAX_FRAME = 64 << 20;
 
 	// Gorilla Tag → Minecraft
@@ -22,6 +22,7 @@ public final class Proto {
 	public static final int GT_INVENTORY = 0x0A;
 	public static final int GT_POINTER = 0x0B;
 	public static final int GT_SCROLL = 0x0C;
+	public static final int GT_SHM = 0x0D;
 
 	// Minecraft → Gorilla Tag
 	public static final int MC_WELCOME = 0x81;
@@ -36,12 +37,15 @@ public final class Proto {
 	public static final int MC_FRAME = 0x8A;
 	public static final int MC_GUI_FRAME = 0x8B;
 	public static final int MC_HELD = 0x8C;
+	public static final int MC_SHM = 0x8D;
 
 	/** GT_HELLO flags: what Gorilla Tag wants. */
 	public static final int WANT_BLOCK_MESHES = 1;
 	public static final int WANT_FRAMES = 2;
 	/** Frames alternate between the two eyes' positions (with WANT_FRAMES). */
 	public static final int WANT_STEREO = 4;
+	/** Frames through shared memory (SharedFrames) instead of the socket, if Gorilla Tag can map it. */
+	public static final int WANT_SHM = 8;
 
 	public static final int EYE_LEFT = 0;
 	public static final int EYE_RIGHT = 1;

@@ -5,11 +5,14 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>disable</Nullable>
     <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../gorillatag/src/Proto.cs" />
     <Compile Include="../../gorillatag/src/Wire.cs" />
     <Compile Include="../../gorillatag/src/LinkClient.cs" />
     <Compile Include="../../gorillatag/src/Messages.cs" />
+    <Compile Include="../../gorillatag/src/SharedFrames.cs" />
+    <Compile Include="../../gorillatag/src/PrismSetup.cs" />
   </ItemGroup>
 </Project>

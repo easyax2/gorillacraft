@@ -48,6 +48,7 @@ final class FrameCapture {
 
 	private final LinkServer link;
 	private final ClientConfig cfg;
+	private final java.util.function.Supplier<dev.gorillacraft.link.SharedFrames> shared;
 	private final Slot[] slots = new Slot[SLOTS];
 	private final ExecutorService rayPool = Executors.newFixedThreadPool(RAY_THREADS + SLOTS, r -> {
 		Thread t = new Thread(r, "GorillaCraft overlay rays");
@@ -68,9 +69,10 @@ final class FrameCapture {
 		boolean busy;
 	}
 
-	FrameCapture(LinkServer link, ClientConfig cfg) {
+	FrameCapture(LinkServer link, ClientConfig cfg, java.util.function.Supplier<dev.gorillacraft.link.SharedFrames> shared) {
 		this.link = link;
 		this.cfg = cfg;
+		this.shared = shared;
 		for (int i = 0; i < SLOTS; i++) {
 			slots[i] = new Slot();
 		}
@@ -78,7 +80,7 @@ final class FrameCapture {
 
 	/** @return whether a frame was started (false: both slots busy, link backed up, or nothing to grab). */
 	boolean capture(Minecraft mc, int eye) {
-		if (failed || link.pendingBytes() > 24L << 20) {
+		if (failed || shared.get() == null && link.pendingBytes() > 24L << 20) {
 			return false;
 		}
 		Slot slot = null;
@@ -157,6 +159,13 @@ final class FrameCapture {
 	private void finish(Slot s, Vec3 cam, int eye) {
 		try (GpuBufferSlice.MappedView view = s.buffer.map(true, false)) {
 			int w = s.width, h = s.height;
+			var shm = shared.get();
+			if (shm != null && dev.gorillacraft.link.SharedFrames.fits(w, h, s.gridW * s.gridH)) {
+				// SkyCraft's way: one copy straight into shared memory, rows as the GPU left them.
+				shm.publish(Math.min(eye, 2), eye, ++frameId, cam.x, cam.y, cam.z, w, h,
+						java.lang.foreign.MemorySegment.ofBuffer(view.data()), s.gridW, s.gridH, s.points);
+				return;
+			}
 			int step = Math.max(1, (w + cfg.overlayWidth - 1) / cfg.overlayWidth);
 			int iw = w / step, ih = h / step;
 			FrameWriter out = new FrameWriter(Proto.MC_FRAME, iw * ih * 4 + s.points.length * 4 + 64);

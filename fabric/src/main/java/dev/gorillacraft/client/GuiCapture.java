@@ -20,13 +20,15 @@ final class GuiCapture {
 	private static final int MAX_WIDTH = 1600;
 
 	private final LinkServer link;
+	private final java.util.function.Supplier<dev.gorillacraft.link.SharedFrames> shared;
 	private GpuBuffer buffer;
 	private int width, height;
 	private boolean busy;
 	private boolean showing;
 
-	GuiCapture(LinkServer link) {
+	GuiCapture(LinkServer link, java.util.function.Supplier<dev.gorillacraft.link.SharedFrames> shared) {
 		this.link = link;
+		this.shared = shared;
 	}
 
 	/** Called after every finished frame. */
@@ -34,11 +36,16 @@ final class GuiCapture {
 		if (!screenOpen) {
 			if (showing) {
 				showing = false;
-				link.send(new FrameWriter(Proto.MC_GUI_FRAME).i32(0).i32(0).finish());
+				var shm = shared.get();
+				if (shm != null) {
+					shm.publish(dev.gorillacraft.link.SharedFrames.GUI, 0, 0, 0, 0, 0, 0, 0, null, 0, 0, null);
+				} else {
+					link.send(new FrameWriter(Proto.MC_GUI_FRAME).i32(0).i32(0).finish());
+				}
 			}
 			return;
 		}
-		if (busy || link.pendingBytes() > 24L << 20) {
+		if (busy || shared.get() == null && link.pendingBytes() > 24L << 20) {
 			return;
 		}
 		GpuTexture color = mc.gameRenderer.mainRenderTarget().getColorTexture();
@@ -66,6 +73,13 @@ final class GuiCapture {
 
 	private void finish() {
 		try (GpuBufferSlice.MappedView view = buffer.map(true, false)) {
+			var shm = shared.get();
+			if (shm != null && dev.gorillacraft.link.SharedFrames.fits(width, height, 0)) {
+				shm.publish(dev.gorillacraft.link.SharedFrames.GUI, 0, 0, 0, 0, 0, width, height,
+						java.lang.foreign.MemorySegment.ofBuffer(view.data()), 0, 0, null);
+				showing = true;
+				return;
+			}
 			int step = Math.max(1, (width + MAX_WIDTH - 1) / MAX_WIDTH);
 			int iw = width / step, ih = height / step;
 			FrameWriter out = new FrameWriter(Proto.MC_GUI_FRAME, iw * ih * 4 + 16);

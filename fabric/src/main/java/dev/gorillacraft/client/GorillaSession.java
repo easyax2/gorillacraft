@@ -39,6 +39,8 @@ public final class GorillaSession {
 	private final MenuActions menu;
 	private final FrameCapture frames;
 	private final GuiCapture gui;
+	private dev.gorillacraft.link.SharedFrames shared;
+	private boolean sharedActive;
 	private int pointerButtons;
 	private String lastHeld = "";
 	private int savedFps;
@@ -83,8 +85,8 @@ public final class GorillaSession {
 		this.link = link;
 		this.cfg = cfg;
 		this.menu = new MenuActions(link, this::status);
-		this.frames = new FrameCapture(link, cfg);
-		this.gui = new GuiCapture(link);
+		this.frames = new FrameCapture(link, cfg, this::sharedFrames);
+		this.gui = new GuiCapture(link, this::sharedFrames);
 	}
 
 	/** True while Gorilla Tag is moving the Minecraft player. */
@@ -166,6 +168,7 @@ public final class GorillaSession {
 
 	private void onConnectionChanged(int cid) {
 		connection = cid;
+		sharedActive = false;
 		lastHeld = "\u0000";
 		wants = Proto.WANT_BLOCK_MESHES;
 		worldSentFor = null;
@@ -190,6 +193,9 @@ public final class GorillaSession {
 				wants = version >= 3 ? m.u8() : Proto.WANT_BLOCK_MESHES;
 				frames.reset();
 				streamer.reset(); // resend sections in the form it wants
+				if ((wants & Proto.WANT_SHM) != 0) {
+					offerSharedFrames();
+				}
 				GorillaCraft.LOG.info("Gorilla Tag plugin {} (protocol {}) connected", gt, version);
 				if (version != Proto.VERSION) {
 					status("Protocol mismatch: Gorilla Tag plugin speaks " + version + ", Minecraft mod speaks " + Proto.VERSION + ". Update both halves.");
@@ -250,12 +256,35 @@ public final class GorillaSession {
 			case Proto.GT_LEAVE_WORLD -> menu.leave(mc);
 			case Proto.GT_INVENTORY -> toggleInventory(mc, m.u8() != 0);
 			case Proto.GT_POINTER -> pointer(mc, m.f32(), m.f32(), m.u8());
+			case Proto.GT_SHM -> {
+				sharedActive = m.u8() != 0 && shared != null;
+				GorillaCraft.LOG.info(sharedActive ? "Gorilla Tag maps the shared frames: frames go through shared memory"
+						: "Gorilla Tag couldn't map the shared frames: frames go through the socket");
+			}
 			case Proto.GT_SCROLL -> {
 				float dy = m.f32();
 				var w = mc.getWindow();
 				mc.mouseHandler.onScroll(w.handle(), 0, dy);
 			}
 			default -> GorillaCraft.LOG.warn("Unknown message 0x{} from Gorilla Tag", Integer.toHexString(m.type));
+		}
+	}
+
+	/** The shared frame memory, once Gorilla Tag has confirmed it can read it; else null (use the socket). */
+	private dev.gorillacraft.link.SharedFrames sharedFrames() {
+		return sharedActive ? shared : null;
+	}
+
+	private void offerSharedFrames() {
+		try {
+			if (shared == null) {
+				shared = dev.gorillacraft.link.SharedFrames.create(cfg.port);
+				var created = shared;
+				Runtime.getRuntime().addShutdownHook(new Thread(created::close, "GorillaCraft shared frames cleanup"));
+			}
+			link.send(new FrameWriter(Proto.MC_SHM).str(shared.path().toString()).f64(shared.size()).finish());
+		} catch (java.io.IOException | RuntimeException e) {
+			GorillaCraft.LOG.warn("No shared memory for frames ({}), using the socket", e.toString());
 		}
 	}
 

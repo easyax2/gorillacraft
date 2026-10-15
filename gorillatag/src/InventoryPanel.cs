@@ -74,6 +74,7 @@ namespace GorillaCraft
             Hide();
         }
 
+        /// <summary>A screen from the socket (rows top-down).</summary>
         public void Show(Messages.GuiFrame f)
         {
             if (f.Width <= 0)
@@ -81,7 +82,30 @@ namespace GorillaCraft
                 Hide();
                 return;
             }
-            if (texture == null || texture.width != f.Width || texture.height != f.Height)
+            Prepare(f.Width, f.Height, false);
+            texture.LoadRawTextureData(f.Rgba);
+            Present();
+        }
+
+        /// <summary>A screen straight from shared memory (rows bottom-up).</summary>
+        public void Show(SharedFrames.Slot f)
+        {
+            if (f.Width <= 0)
+            {
+                Hide();
+                return;
+            }
+            Prepare(f.Width, f.Height, f.BottomUp);
+            texture.LoadRawTextureData(f.Pixels, f.Width * f.Height * 4);
+            Present();
+        }
+
+        private bool flipped;
+
+        private void Prepare(int width, int height, bool bottomUp)
+        {
+            var f = (Width: width, Height: height);
+            if (texture == null || texture.width != f.Width || texture.height != f.Height || flipped == bottomUp)
             {
                 if (texture != null)
                     Object.Destroy(texture);
@@ -89,14 +113,20 @@ namespace GorillaCraft
                 panelMaterial.mainTexture = texture;
                 if (panelMaterial.HasProperty("_BaseMap"))
                     panelMaterial.SetTexture("_BaseMap", texture);
-                // Rows come top first, Unity loads the first row at the bottom: flip the quad's V.
-                panelMaterial.mainTextureScale = new Vector2(1f, -1f);
-                panelMaterial.mainTextureOffset = new Vector2(0f, 1f);
+                // Unity loads the first row at the bottom: socket screens come top first, so flip
+                // the quad's V for those; shared-memory screens are already bottom-up.
+                flipped = !bottomUp;
+                var st = flipped ? new Vector4(1f, -1f, 0f, 1f) : new Vector4(1f, 1f, 0f, 0f);
+                panelMaterial.mainTextureScale = new Vector2(st.x, st.y);
+                panelMaterial.mainTextureOffset = new Vector2(st.z, st.w);
                 if (panelMaterial.HasProperty("_BaseMap_ST"))
-                    panelMaterial.SetVector("_BaseMap_ST", new Vector4(1f, -1f, 0f, 1f));
+                    panelMaterial.SetVector("_BaseMap_ST", st);
                 aspect = f.Height / (float)f.Width;
             }
-            texture.LoadRawTextureData(f.Rgba);
+        }
+
+        private void Present()
+        {
             texture.Apply(false);
             if (!Open)
                 PlaceInFront();

@@ -99,6 +99,9 @@ sections, `sectionsPerTick`, and for the overlay `overlayWidth`, `overlayGrid`, 
   against Gorilla Tag. Expect tuning: `BlockScale`, `TouchDistance` and the wrist panel position.
 - Container screens (chests, furnaces, crafting tables) can't be shown in Gorilla Tag yet. They
   close straight away. Use the Minecraft window for your inventory.
+- Frames go from Minecraft to Gorilla Tag through shared memory, the way SkyCraft hands its
+  overlay to Skyrim (about 115 frames/s at 1920×1200 in testing; real worlds cost Minecraft more
+  to draw).
 - The overlay updates at Minecraft's frame rate, shared between the eyes (each eye gets every
   other frame: raise Minecraft's Max Framerate to 60+ if you can). The 3D surface keeps head
   turning smooth in between. Fast movement shows edges where Minecraft hasn't drawn

@@ -33,6 +33,8 @@ namespace GorillaCraft
             public int GridW, GridH;
             public Matrix4x4 LocalToWorld = Matrix4x4.identity;
             public bool HasFrame;
+            public bool BottomUp;
+            public float[] Points = new float[0];
         }
 
         private readonly Surface[] surfaces = new Surface[3]; // left, right, centre
@@ -69,10 +71,35 @@ namespace GorillaCraft
             data?.scriptableRenderer?.EnqueuePass(pass);
         }
 
+        /// <summary>A picture from the socket (rows top-down).</summary>
         public void Show(Messages.Frame f, Coords coords)
         {
-            int eye = Mathf.Clamp(f.Eye, 0, 2);
+            Surface s = Prepare(f.Eye, f.Width, f.Height, f.GridW, f.GridH, false);
+            s.Texture.LoadRawTextureData(f.Rgba);
+            s.Texture.Apply(false);
+            Finish(s, f.Points, f.CamX, f.CamY, f.CamZ, coords);
+        }
+
+        /// <summary>A picture straight from shared memory (rows bottom-up, as Unity loads them).</summary>
+        public void Show(SharedFrames.Slot f, Coords coords)
+        {
+            if (f.Width <= 0 || f.GridW < 2 || f.GridH < 2)
+                return;
+            Surface s = Prepare(f.Eye, f.Width, f.Height, f.GridW, f.GridH, f.BottomUp);
+            s.Texture.LoadRawTextureData(f.Pixels, f.Width * f.Height * 4);
+            s.Texture.Apply(false);
+            int n = f.GridW * f.GridH * 3;
+            if (s.Points.Length != n)
+                s.Points = new float[n];
+            System.Runtime.InteropServices.Marshal.Copy(f.Points, s.Points, 0, n);
+            Finish(s, s.Points, f.CamX, f.CamY, f.CamZ, coords);
+        }
+
+        private Surface Prepare(int eyeIndex, int width, int height, int gridW, int gridH, bool bottomUp)
+        {
+            int eye = Mathf.Clamp(eyeIndex, 0, 2);
             Surface s = surfaces[eye];
+            var f = (Width: width, Height: height, GridW: gridW, GridH: gridH);
             if (s.Texture == null || s.Texture.width != f.Width || s.Texture.height != f.Height)
             {
                 if (s.Texture != null)
@@ -82,20 +109,22 @@ namespace GorillaCraft
                 if (s.Material.HasProperty("_BaseMap"))
                     s.Material.SetTexture("_BaseMap", s.Texture);
             }
-            s.Texture.LoadRawTextureData(f.Rgba);
-            s.Texture.Apply(false);
-
-            int n = f.GridW * f.GridH;
-            if (f.GridW != s.GridW || f.GridH != s.GridH)
+            if (f.GridW != s.GridW || f.GridH != s.GridH || bottomUp != s.BottomUp)
             {
+                s.BottomUp = bottomUp;
+                int n = f.GridW * f.GridH;
                 s.GridW = f.GridW;
                 s.GridH = f.GridH;
                 s.Vertices = new Vector3[n];
                 var uvs = new Vector2[n];
-                // The picture's first row is the top; Unity loads the first row at v = 0.
+                // Grid rows go top to bottom. Unity puts the first pixel row at v = 0: that's the
+                // top for socket frames, the bottom for shared-memory ones.
                 for (int y = 0; y < s.GridH; y++)
                     for (int x = 0; x < s.GridW; x++)
-                        uvs[y * s.GridW + x] = new Vector2(x / (s.GridW - 1f), y / (s.GridH - 1f));
+                    {
+                        float v = y / (s.GridH - 1f);
+                        uvs[y * s.GridW + x] = new Vector2(x / (s.GridW - 1f), bottomUp ? 1f - v : v);
+                    }
                 s.Triangles.Clear();
                 for (int y = 0; y < s.GridH - 1; y++)
                 {
@@ -111,13 +140,18 @@ namespace GorillaCraft
                 s.Mesh.uv = uvs;
                 s.Mesh.SetTriangles(s.Triangles, 0, false);
             }
+            return s;
+        }
 
+        private static void Finish(Surface s, float[] points, double camX, double camY, double camZ, Coords coords)
+        {
             // Points are relative to the camera Minecraft drew from, so floats stay small.
+            int n = s.GridW * s.GridH;
             for (int i = 0; i < n; i++)
-                s.Vertices[i] = new Vector3(f.Points[i * 3], f.Points[i * 3 + 1], -f.Points[i * 3 + 2]); // flip Z
+                s.Vertices[i] = new Vector3(points[i * 3], points[i * 3 + 1], -points[i * 3 + 2]); // flip Z
             s.Mesh.vertices = s.Vertices;
             s.Mesh.RecalculateBounds();
-            s.LocalToWorld = Matrix4x4.TRS(coords.ToUnity(f.CamX, f.CamY, f.CamZ), Quaternion.identity, Vector3.one * coords.Scale);
+            s.LocalToWorld = Matrix4x4.TRS(coords.ToUnity(camX, camY, camZ), Quaternion.identity, Vector3.one * coords.Scale);
             s.HasFrame = true;
         }
 

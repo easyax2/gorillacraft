@@ -103,6 +103,13 @@ namespace GorillaCraft
             public byte[] Png;
         }
 
+        /// <summary>Minecraft offers its frames through shared memory (SharedFrames).</summary>
+        public sealed class Shm
+        {
+            public string Path;
+            public long Size;
+        }
+
         public static readonly Box FullCube = new Box { MaxX = 1, MaxY = 1, MaxZ = 1 };
 
         public static object Parse(byte type, FrameReader r)
@@ -145,6 +152,8 @@ namespace GorillaCraft
                     return h;
                 case Proto.McStatus:
                     return new Status { Text = r.Str() };
+                case Proto.McShm:
+                    return new Shm { Path = r.Str(), Size = (long)r.F64() };
                 case Proto.McGuiFrame:
                     var g = new GuiFrame { Width = r.I32(), Height = r.I32() };
                     g.Rgba = g.Width > 0 ? r.Bytes(g.Width * g.Height * 4) : null;

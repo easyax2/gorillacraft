@@ -24,6 +24,12 @@ public class GorillaLinkClientTest implements FabricClientGameTest {
 	@Override
 	public void runTest(ClientGameTestContext context) {
 		Path dir = Path.of(System.getenv().getOrDefault("GORILLACRAFT_TEST_DIR", System.getProperty("java.io.tmpdir")));
+		String size = System.getenv("GORILLACRAFT_TEST_WINDOW"); // e.g. 1920x1200, to measure the overlay at full size
+		if (size != null && size.matches("\\d+x\\d+")) {
+			int w = Integer.parseInt(size.split("x")[0]), h = Integer.parseInt(size.split("x")[1]);
+			context.runOnClient(mc -> mc.getWindow().setWindowed(w, h));
+			context.waitTicks(5);
+		}
 		try (TestSingleplayerContext sp = context.worldBuilder().create()) {
 			sp.getConnection().waitForChunksRender();
 			TestServerContext server = sp.getServer();
