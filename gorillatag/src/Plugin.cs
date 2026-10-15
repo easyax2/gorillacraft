@@ -16,11 +16,11 @@ namespace GorillaCraft
     /// rooms, and in modded lobbies (Utilla's, if it's installed). Never in public lobbies.
     /// </summary>
     [BepInPlugin(Guid, Name, Version)]
-    public sealed class Plugin : BaseUnityPlugin
+    public sealed class Plugin : BaseUnityPlugin, MainMenu.IHost
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.2.0";
+        public const string Version = "0.3.0";
 
         internal static ManualLogSource Log;
 
@@ -29,6 +29,9 @@ namespace GorillaCraft
         private ConfigEntry<Vector3> anchor;
         private ConfigEntry<float> blockScale;
         private ConfigEntry<float> touchDistance;
+        private ConfigEntry<float> punchSpeed;
+        private ConfigEntry<float> punchHold;
+        private ConfigEntry<bool> fistMode;
         private ConfigEntry<bool> autoEnter;
         private ConfigEntry<int> sectionsPerFrame;
         private ConfigEntry<string> shaderName;
@@ -37,6 +40,11 @@ namespace GorillaCraft
         private ConfigEntry<string> prismPath;
         private ConfigEntry<string> prismDataDir;
         private ConfigEntry<string> worldName;
+        private ConfigEntry<string> servers;
+        private ConfigEntry<bool> menuAtStart;
+        private MainMenu menu;
+        private string lastStatus = "";
+        private string worldLabel = "";
 
         private LinkClient link;
         private MinecraftWorld world;
@@ -69,7 +77,10 @@ namespace GorillaCraft
             anchor = Config.Bind("Map", "Anchor", new Vector3(0f, 1500f, 0f),
                 "Where the Minecraft world's spawn point is placed in Gorilla Tag's world, far away from Gorilla Tag's own maps.");
             blockScale = Config.Bind("Map", "BlockScale", 1f, "Size of one Minecraft block in Gorilla Tag units (meters).");
-            touchDistance = Config.Bind("Hands", "TouchDistance", 0.12f, "How close (in Gorilla Tag units) a hand must be to a block to mine or use it.");
+            touchDistance = Config.Bind("Hands", "TouchDistance", 0.12f, "How close (in Gorilla Tag units) a hand must be to a block to punch or use it.");
+            punchSpeed = Config.Bind("Hands", "PunchSpeed", 2.0f, "How fast (meters per second) a hand must hit a block to count as a punch. Lower: lighter taps break blocks; higher: climbing never does.");
+            punchHold = Config.Bind("Hands", "PunchHold", 0.4f, "Seconds Minecraft keeps mining after each punch. Survival blocks that take longer need more punches.");
+            fistMode = Config.Bind("Hands", "FistMode", false, "Only punches with a fist (grip held) break blocks, so climbing never does. The trigger then uses/places instead of the grip.");
             autoEnter = Config.Bind("Map", "AutoEnter", true, "Enter the Minecraft map as soon as Minecraft is ready (alone, in a private room or in a modded lobby). Hold B+Y for a second to enter or leave by hand.");
             sectionsPerFrame = Config.Bind("Performance", "SectionsPerFrame", 4, "How many 16x16x16 block sections to build per frame.");
             shaderName = Config.Bind("Rendering", "Shader", "Universal Render Pipeline/Particles/Unlit", "Shader used for blocks.");
@@ -78,12 +89,61 @@ namespace GorillaCraft
             prismPath = Config.Bind("Minecraft", "PrismPath", "", "Full path to prismlauncher.exe. Empty: look in the usual install folders.");
             prismDataDir = Config.Bind("Minecraft", "PrismDataDir", "", "Prism's data folder (the one with instances in it). Empty: the default one.");
             worldName = Config.Bind("Minecraft", "World", "GorillaCraft", "Singleplayer world Minecraft opens by itself (created the first time). Only used when the instance is first created.");
+            servers = Config.Bind("Menu", "Servers", "", "Servers you joined from the menu, newest first, separated by ;");
+            menuAtStart = Config.Bind("Menu", "OpenAtStart", true, "Show the GorillaCraft menu on your monitor when Gorilla Tag starts. F1 opens/closes it.");
             wantEnter = autoEnter.Value;
+            menu = new MainMenu(this, MenuSettings(), () => new List<string>(servers.Value.Split(new[] { ';' }, System.StringSplitOptions.RemoveEmptyEntries)),
+                list => servers.Value = string.Join(";", list), menuAtStart.Value);
             launchCheckAt = Time.realtimeSinceStartup + 5f;
 
             link = new LinkClient(host.Value, port.Value, s => Log.LogInfo(s));
             link.Start();
         }
+
+        private List<MainMenu.Setting> MenuSettings()
+        {
+            string OnOff(bool b) => b ? "on" : "off";
+            return new List<MainMenu.Setting>
+            {
+                new MainMenu.Setting { Name = "Enter the map automatically", Value = () => OnOff(autoEnter.Value), Change = d => autoEnter.Value = !autoEnter.Value },
+                new MainMenu.Setting { Name = "Fist mode (punch with grip, use with trigger)", Value = () => OnOff(fistMode.Value), Change = d => fistMode.Value = !fistMode.Value },
+                new MainMenu.Setting { Name = "Punch speed", Value = () => punchSpeed.Value.ToString("0.0") + " m/s", Change = d => punchSpeed.Value = Mathf.Clamp(punchSpeed.Value + 0.2f * d, 0.2f, 6f) },
+                new MainMenu.Setting { Name = "Mining per punch", Value = () => punchHold.Value.ToString("0.00") + " s", Change = d => punchHold.Value = Mathf.Clamp(punchHold.Value + 0.05f * d, 0.05f, 2f) },
+                new MainMenu.Setting { Name = "Hand reach", Value = () => touchDistance.Value.ToString("0.00") + " m", Change = d => touchDistance.Value = Mathf.Clamp(touchDistance.Value + 0.02f * d, 0.02f, 0.5f) },
+                new MainMenu.Setting { Name = "Block size (after restart)", Value = () => blockScale.Value.ToString("0.0#") + " m", Change = d => blockScale.Value = Mathf.Clamp(blockScale.Value + 0.1f * d, 0.2f, 3f) },
+                new MainMenu.Setting { Name = "Start Minecraft with Gorilla Tag", Value = () => OnOff(autoLaunch.Value), Change = d => autoLaunch.Value = !autoLaunch.Value },
+                new MainMenu.Setting { Name = "Open this menu at start", Value = () => OnOff(menuAtStart.Value), Change = d => menuAtStart.Value = !menuAtStart.Value },
+            };
+        }
+
+        private void OnGUI()
+        {
+            menu?.OnGUI();
+        }
+
+        // MainMenu.IHost
+        bool MainMenu.IHost.Connected => link.Connected;
+        bool MainMenu.IHost.HasWorld => world != null && world.HasWorld;
+        string MainMenu.IHost.WorldLabel => worldLabel;
+        bool MainMenu.IHost.InMap => inMap;
+        bool MainMenu.IHost.ModsAllowed => ModsAllowedHere();
+        string MainMenu.IHost.LastStatus => lastStatus;
+
+        void MainMenu.IHost.ToggleMap()
+        {
+            if (inMap)
+            {
+                wantEnter = false;
+                ExitMap(null);
+            }
+            else
+                wantEnter = true;
+        }
+
+        void MainMenu.IHost.RequestWorlds() => link.Send(new FrameWriter(Proto.GtListWorlds).Finish());
+        void MainMenu.IHost.OpenWorld(string id) { wantEnter = true; link.Send(new FrameWriter(Proto.GtOpenWorld).Str(id).Finish()); }
+        void MainMenu.IHost.JoinServer(string address) { wantEnter = true; link.Send(new FrameWriter(Proto.GtJoinServer).Str(address).Finish()); }
+        void MainMenu.IHost.LeaveWorld() => link.Send(new FrameWriter(Proto.GtLeaveWorld).Finish());
 
         private void OnDestroy()
         {
@@ -158,7 +218,7 @@ namespace GorillaCraft
             world.Coords.Anchor = anchor.Value;
             world.Coords.Scale = Mathf.Max(0.05f, blockScale.Value);
             Shader highlightShader = Shader.Find(shaderName.Value) ?? Shader.Find("Sprites/Default");
-            hands = new HandInteraction(world, link, touchDistance.Value, highlightShader);
+            hands = new HandInteraction(world, link, touchDistance.Value, punchSpeed.Value, punchHold.Value, fistMode.Value, highlightShader);
             wrist = new WristDisplay(player.GetControllerTransform(true));
             wrist.SetConnected(link.Connected);
             Log.LogInfo($"Ready (block colliders on layer {layer})");
@@ -195,6 +255,10 @@ namespace GorillaCraft
             if (!inMap && wantEnter && allowed && link.Connected && world.HasWorld)
                 EnterMap();
 
+            hands.reach = touchDistance.Value;
+            hands.punchSpeed = punchSpeed.Value;
+            hands.punchHold = punchHold.Value;
+            hands.fistMode = fistMode.Value;
             if (inMap)
             {
                 UpdateHold();
@@ -227,6 +291,7 @@ namespace GorillaCraft
                 case Messages.World w:
                     pendingSections.Clear();
                     world.SetWorld(w);
+                    worldLabel = w.Label ?? "";
                     Log.LogInfo(w.HasWorld ? $"Minecraft world: {w.Dimension}, spawn {w.OriginX} {w.OriginY} {w.OriginZ}" : "Minecraft has no world open");
                     if (!w.HasWorld && inMap)
                         ExitMap("Minecraft closed its world");
@@ -250,6 +315,9 @@ namespace GorillaCraft
                     hands.SelectedSlot = h.Selected;
                     wrist.SetHotbar(h);
                     break;
+                case Messages.Worlds ws:
+                    menu.SetWorlds(ws);
+                    break;
                 case Messages.Status st:
                     SetStatus(st.Text);
                     break;
@@ -259,7 +327,8 @@ namespace GorillaCraft
         private void SetStatus(string text)
         {
             Log.LogInfo("Minecraft: " + text);
-            wrist.SetStatus(text);
+            lastStatus = text;
+            wrist?.SetStatus(text);
         }
 
         /// <summary>Builds a few sections per frame, nearest to the gorilla first.</summary>

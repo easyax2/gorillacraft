@@ -35,10 +35,15 @@ final class AutoWorld {
 			GorillaCraft.LOG.info("Opening world {} for Gorilla Tag", WORLD);
 			flows.openWorld(WORLD, () -> mc.gui.setScreen(screen));
 		} else {
-			GorillaCraft.LOG.info("Creating world {} for Gorilla Tag", WORLD);
-			LevelSettings settings = new LevelSettings(WORLD, GameType.CREATIVE,
-					new LevelSettings.DifficultySettings(Difficulty.PEACEFUL, false, false), true, WorldDataConfiguration.DEFAULT);
-			flows.createFreshLevel(WORLD, settings, WorldOptions.defaultWithRandomSeed(), WorldPresets::createNormalWorldDimensions, screen);
+			create(mc, WORLD, screen);
 		}
+	}
+
+	/** A new creative, peaceful world with cheats on. */
+	static void create(Minecraft mc, String name, Screen parent) {
+		GorillaCraft.LOG.info("Creating world {} for Gorilla Tag", name);
+		LevelSettings settings = new LevelSettings(name, GameType.CREATIVE,
+				new LevelSettings.DifficultySettings(Difficulty.PEACEFUL, false, false), true, WorldDataConfiguration.DEFAULT);
+		mc.createWorldOpenFlows().createFreshLevel(name, settings, WorldOptions.defaultWithRandomSeed(), WorldPresets::createNormalWorldDimensions, parent);
 	}
 }

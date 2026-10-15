@@ -2,8 +2,11 @@ package dev.gorillacraft.test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Properties;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerContext;
+import net.minecraft.client.gui.screens.TitleScreen;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.core.BlockPos;
@@ -60,6 +63,32 @@ public class GorillaLinkClientTest implements FabricClientGameTest {
 				throw new AssertionError("player isn't where the gorilla's head is");
 			}
 		}
+
+		// Multiplayer: a dedicated server with the mod. The stand-in joins it through the menu
+		// protocol (not through the gametest), enters the map and mines on the server.
+		Properties props = new Properties();
+		props.setProperty("server-port", "34571");
+		props.setProperty("gamemode", "creative");
+		props.setProperty("force-gamemode", "true");
+		try (TestDedicatedServerContext server = context.worldBuilder().createServer(props)) {
+			server.runCommand("forceload add 0 0");
+			server.runCommand("setblock 3 -60 3 stone");
+			touch(dir.resolve("server-ready"));
+			System.out.println("GORILLACRAFT TEST server ready");
+			context.waitFor(mc -> Files.exists(dir.resolve("done-server")), 20 * 180);
+			BlockState mined = server.computeOnServer(s -> s.overworld().getBlockState(new BlockPos(3, -60, 3)));
+			System.out.println("GORILLACRAFT TEST server mined=" + mined);
+			if (!mined.isAir()) {
+				throw new AssertionError("stone at 3 -60 3 wasn't mined on the server: " + mined);
+			}
+		}
+		// The dedicated server runs in this JVM, so singleplayer only works once it's gone.
+		touch(dir.resolve("server-closed"));
+		// The stand-in now creates a singleplayer world through the menu protocol, lists the
+		// worlds and leaves again.
+		context.waitFor(mc -> Files.exists(dir.resolve("done-all")), 20 * 180);
+		context.waitFor(mc -> mc.level == null && mc.getConnection() == null, 20 * 60);
+		context.runOnClient(mc -> mc.gui.setScreen(new TitleScreen()));
 	}
 
 	private static void touch(Path p) {

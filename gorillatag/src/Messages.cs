@@ -13,6 +13,14 @@ namespace GorillaCraft
             public string Dimension;
             public int OriginX, OriginY, OriginZ;
             public int MinY, MaxY;
+            /// <summary>World name in singleplayer, server address in multiplayer.</summary>
+            public string Label;
+        }
+
+        public sealed class Worlds
+        {
+            public string[] Ids;
+            public string[] Names;
         }
 
         public sealed class Atlas { public byte[] Png; }
@@ -78,8 +86,17 @@ namespace GorillaCraft
                     {
                         HasWorld = r.U8() != 0, Dimension = r.Str(),
                         OriginX = r.I32(), OriginY = r.I32(), OriginZ = r.I32(),
-                        MinY = r.I32(), MaxY = r.I32(),
+                        MinY = r.I32(), MaxY = r.I32(), Label = r.Str(),
                     };
+                case Proto.McWorlds:
+                    int n = r.I32();
+                    var ws = new Worlds { Ids = new string[n], Names = new string[n] };
+                    for (int i = 0; i < n; i++)
+                    {
+                        ws.Ids[i] = r.Str();
+                        ws.Names[i] = r.Str();
+                    }
+                    return ws;
                 case Proto.McAtlas:
                     return new Atlas { Png = r.Bytes(r.I32()) };
                 case Proto.McSection:

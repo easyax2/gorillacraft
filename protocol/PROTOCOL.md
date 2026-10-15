@@ -1,4 +1,4 @@
-# GorillaCraft link protocol (version 1)
+# GorillaCraft link protocol (version 2)
 
 Loopback TCP. Minecraft listens on `127.0.0.1:47123` (configurable), Gorilla Tag connects and
 reconnects as needed. One Gorilla Tag at a time; a new connection replaces the old one.
@@ -24,19 +24,24 @@ Faces use Minecraft's `Direction` 3D data value: 0 down, 1 up, 2 north, 3 south,
 | 0x03 | MINE | `u8 active, i32 x, i32 y, i32 z, u8 face` — sent when the mined block/face changes or mining stops |
 | 0x04 | USE | `i32 x, i32 y, i32 z, u8 face, f64 hitX, f64 hitY, f64 hitZ` — one right-click on that block |
 | 0x05 | SLOT | `u8 slot (0-8)` |
+| 0x06 | LIST_WORLDS | — (answered with WORLDS) |
+| 0x07 | OPEN_WORLD | `str id` — open that singleplayer world, or create it (creative, cheats on) if there's none; leaves the current world first |
+| 0x08 | JOIN_SERVER | `str address` — leave the current world, then connect |
+| 0x09 | LEAVE_WORLD | — save and quit to the title screen |
 
 ## Minecraft → Gorilla Tag
 
 | Type | Name | Payload |
 |---|---|---|
 | 0x81 | WELCOME | `i32 protocolVersion` |
-| 0x82 | WORLD | `u8 hasWorld, str dimension, i32 originX, originY, originZ (world spawn), i32 minY, i32 maxY` — drop every section |
+| 0x82 | WORLD | `u8 hasWorld, str dimension, i32 originX, originY, originZ (world spawn), i32 minY, i32 maxY, str label (world name, or server address)` — drop every section |
 | 0x83 | ATLAS | `i32 length, PNG bytes` — Minecraft's block atlas; section UVs point into it (v = 0 is the top row) |
 | 0x84 | SECTION | see below |
 | 0x85 | SECTION_REMOVE | `i32 sx, sy, sz` |
 | 0x86 | TELEPORT | `i32 id, f64 x, f64 y, f64 z (eyes), f32 yaw` |
 | 0x87 | HOTBAR | `u8 selected`, then 9 × `str name, u8 count` |
 | 0x88 | STATUS | `str text` |
+| 0x89 | WORLDS | `i32 n`, then n × `str id, str name` — singleplayer worlds, most recently played first (not the one that's open) |
 
 ### SECTION
 

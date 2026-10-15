@@ -19,6 +19,7 @@ static class Program
     static Messages.Hotbar hotbar;
     static Messages.Teleport teleport;
     static byte[] atlas;
+    static Messages.Worlds worldsList;
     static int sectionUpdates;
     static readonly List<string> statuses = new();
     static int failures;
@@ -93,8 +94,42 @@ static class Program
         Pump(200);
         for (int i = 0; i < 10; i++) { SendPose(true, teleport.Id, 10.5, -58.3, 10.5); Pump(50); }
 
-        Console.WriteLine("statuses: " + string.Join(" | ", statuses));
         File.WriteAllText(Path.Combine(dir, "done"), "");
+
+        // Menu: join the dedicated server.
+        WaitFor(() => File.Exists(Path.Combine(dir, "server-ready")), 120, "dedicated server");
+        int tpBefore = teleport.Id;
+        link.Send(new FrameWriter(Proto.GtJoinServer).Str("127.0.0.1:34571").Finish());
+        WaitFor(() => world != null && world.HasWorld && world.Label == "127.0.0.1:34571", 60, "WORLD from the server");
+        Console.WriteLine($"joined server: label {world.Label}, spawn {world.OriginX} {world.OriginY} {world.OriginZ}");
+        WaitFor(() => teleport.Id > tpBefore, 15, "TELEPORT into the server world");
+        for (int i = 0; i < 10; i++) { SendPose(true, teleport.Id, 3.5, -58.3, 1.5); Pump(50); }
+        WaitFor(() => HasShape(3, -60, 3), 30, "server stone arrives");
+        link.Send(new FrameWriter(Proto.GtMine).U8(1).I32(3).I32(-60).I32(3).U8((int)Proto.Face.Up).Finish());
+        WaitFor(() => !HasShape(3, -60, 3), 10, "stone mined on the server");
+        link.Send(new FrameWriter(Proto.GtMine).U8(0).I32(3).I32(-60).I32(3).U8((int)Proto.Face.Up).Finish());
+        Console.WriteLine("mined stone on the server");
+        Pump(500);
+        File.WriteAllText(Path.Combine(dir, "done-server"), "");
+
+        // Menu: create a new singleplayer world by name, list the worlds, then leave.
+        WaitFor(() => File.Exists(Path.Combine(dir, "server-closed")), 60, "dedicated server closed");
+        Pump(1000);
+        link.Send(new FrameWriter(Proto.GtOpenWorld).Str("LinkTestWorld").Finish());
+        WaitFor(() => world != null && world.HasWorld && world.Label == "LinkTestWorld", 90, "new world LinkTestWorld");
+        Console.WriteLine("created and opened LinkTestWorld");
+        link.Send(new FrameWriter(Proto.GtLeaveWorld).Finish());
+        WaitFor(() => world != null && !world.HasWorld, 30, "left the world");
+        Console.WriteLine("left the world");
+        // The world that's open is locked and not listed, so list after leaving.
+        worldsList = null;
+        link.Send(new FrameWriter(Proto.GtListWorlds).Finish());
+        WaitFor(() => worldsList != null, 10, "WORLDS");
+        Console.WriteLine("worlds: " + string.Join(", ", worldsList.Names));
+        Check(Array.IndexOf(worldsList.Ids, "LinkTestWorld") >= 0, "world list has the new world");
+
+        Console.WriteLine("statuses: " + string.Join(" | ", statuses));
+        File.WriteAllText(Path.Combine(dir, "done-all"), "");
         Pump(500);
         link.Dispose();
         Console.WriteLine(failures == 0 ? "LINKTEST PASSED" : $"LINKTEST FAILED ({failures})");
@@ -126,6 +161,7 @@ static class Program
                     case Messages.Teleport t: teleport = t; break;
                     case Messages.Hotbar h: hotbar = h; break;
                     case Messages.Status st: statuses.Add(st.Text); break;
+                    case Messages.Worlds ws: worldsList = ws; break;
                 }
             }
             Thread.Sleep(5);

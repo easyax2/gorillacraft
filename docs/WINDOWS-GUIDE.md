@@ -3,7 +3,7 @@
 This guide takes you from a plain Gorilla Tag and Minecraft install to climbing around your
 Minecraft world as a gorilla. Each step says how to check that it worked before you move on.
 
-> **Early release.** GorillaCraft 0.2.0 has been tested end to end with a real Minecraft client
+> **Early release.** GorillaCraft 0.3.0 has been tested end to end with a real Minecraft client
 > and a stand-in for Gorilla Tag, but not yet in a VR headset. Things like the size of blocks and
 > how close your hand has to be may need tuning (see [Settings](#7-settings)). Please report what
 > you find.
@@ -15,9 +15,9 @@ Minecraft world as a gorilla. Each step says how to check that it worked before 
 3. [Install Prism Launcher](#3-install-prism-launcher)
 4. [Install the GorillaCraft plugin](#4-install-the-gorillacraft-plugin)
 5. [Play](#5-play)
-6. [Controls](#6-controls)
+6. [Controls and the main menu](#6-controls-and-the-main-menu)
 7. [Settings](#7-settings)
-8. [Playing with friends](#8-playing-with-friends)
+8. [Multiplayer: playing with friends on a server](#8-multiplayer-playing-with-friends-on-a-server)
 9. [Performance tips](#9-performance-tips)
 10. [Troubleshooting](#10-troubleshooting)
 11. [Updating and uninstalling](#11-updating-and-uninstalling)
@@ -39,7 +39,7 @@ you into it. You don't install anything in Minecraft yourself.
 | **Minecraft: Java Edition** | Owned on your Microsoft account. GorillaCraft uses version 26.3, and Prism downloads it for you. |
 | **[Prism Launcher](https://prismlauncher.org/download/windows/)** | Free Minecraft launcher. GorillaCraft uses it to install and start Minecraft for you. |
 | **A reasonably strong PC** | Both games run at once. Plan for 16 GB of RAM and a GPU that already runs Gorilla Tag comfortably. |
-| **From the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)** | `GorillaCraft.dll`, or `GorillaCraft-0.2.0-GorillaTag.zip` with the same dll already in its folders. The Minecraft mod is inside the dll; the separate `.jar` is only for servers and manual installs. |
+| **From the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)** | `GorillaCraft.dll`, or `GorillaCraft-0.3.0-GorillaTag.zip` with the same dll already in its folders. The Minecraft mod is inside the dll; the separate `.jar` is only for servers and manual installs. |
 
 **Utilla isn't needed.** GorillaCraft works:
 
@@ -103,9 +103,9 @@ You don't need to create an instance or download any mods. GorillaCraft does tha
 **Check:** start Gorilla Tag, then open `BepInEx\LogOutput.log` in Notepad. You should see:
 
 ```
-[Info   :   BepInEx] Loading [GorillaCraft 0.2.0]
+[Info   :   BepInEx] Loading [GorillaCraft 0.3.0]
 [Info   :GorillaCraft] Ready (block colliders on layer 0)
-[Info   :GorillaCraft] Prism instance in C:\Users\...\AppData\Roaming\PrismLauncher: created instance; installed gorillacraft-fabric-0.2.0+26.3.jar; installed fabric-api-0.161.0+26.3.jar
+[Info   :GorillaCraft] Prism instance in C:\Users\...\AppData\Roaming\PrismLauncher: created instance; installed gorillacraft-fabric-0.3.0+26.3.jar; installed fabric-api-0.161.0+26.3.jar
 ```
 
 `BepInEx\config\dev.gorillacraft.cfg` now exists too. That's the settings file (see
@@ -128,13 +128,25 @@ The instance also starts with settings suited to running in the background: 30 F
 distance 6, music off, 3 GB of memory. You can change any of them in Prism or in Minecraft;
 GorillaCraft only creates them once, and after that it only updates its own mod jar.
 
+**Starting it yourself:** on Windows you don't need a launch command; Gorilla Tag starts the
+instance. To start it by hand (a shortcut, a script, or with `AutoLaunch` off), run:
+
+```
+"%LOCALAPPDATA%\Programs\PrismLauncher\prismlauncher.exe" --launch GorillaCraft
+```
+
+(adjust the path if Prism is installed elsewhere, e.g. `C:\Program Files\PrismLauncher\`). Add
+`--server play.example.com` to join a server straight away instead of the world.
+
 You can also use the instance like any other one: start it from Prism, play it normally, add
 mods. Want a different world? Open it yourself from Minecraft's menu; GorillaCraft uses whatever
 world or server Minecraft is in.
 
 ## 5. Play
 
-1. Put on your headset and **start Gorilla Tag**.
+1. **Start Gorilla Tag.** The GorillaCraft menu appears on your monitor (see
+   [section 6](#6-controls-and-the-main-menu)); you can use it now or close it with F1/Esc and
+   put on your headset.
 2. Wait in the forest without joining a room. The first time, Prism downloads Minecraft, so
    this takes a few minutes. Your left wrist shows what's happening, e.g.
    "Starting Minecraft through Prism Launcher...". A Minecraft window opens on your desktop and
@@ -153,16 +165,24 @@ from Minecraft such as "Containers can't be opened from Gorilla Tag yet".
 To leave the Minecraft map, hold **B + Y** for a second. You're put back where you were in
 Gorilla Tag. Hold B + Y again to go back in.
 
-## 6. Controls
+## 6. Controls and the main menu
+
+### In VR
 
 | Do this | Happens in Minecraft |
 |---|---|
-| Hand on a block, hold **trigger** | Mine it. Survival uses Minecraft's real break times, tools and drops; creative breaks with one hit. |
+| **Punch** a block | Mine it. Each punch keeps Minecraft mining for a moment (0.4 s by default): creative breaks with one punch, survival takes as many punches as the block's break time. Tools in your hotbar speed it up, and drops are Minecraft's. |
 | Hand on a block, press **grip** | Right-click it with the held item: place a block on that face, open a door/trapdoor/gate, press a button, flip a lever, use a bucket, ... |
 | **A** (right controller) | Next hotbar slot |
 | **X** (left controller) | Previous hotbar slot |
 | Hold **B + Y** for 1 second | Enter or leave the Minecraft map |
 
+- A punch is your hand **arriving** at a block faster than 2 m/s (the `Punch speed` setting).
+  Resting a hand on a block, or slow climbing, doesn't break it.
+- Fast climbing slaps a surface just like a punch does, so in creative they can break the block
+  you're climbing on. If that happens too often, raise `Punch speed`, or turn on **fist mode**:
+  then only punches with **grip held** (a fist) break blocks, and the **trigger** does the
+  right-click instead of the grip.
 - A highlight box shows which block your hand is on: white when touching, orange while mining.
 - You can touch blocks you can walk through, like torches, flowers, tall grass, buttons and levers.
   You can't climb on them.
@@ -171,11 +191,45 @@ Gorilla Tag. Hold B + Y again to go back in.
 - **Your inventory:** use the Minecraft window (Alt+Tab, press E) to move items into your hotbar.
   The same goes for chat and commands such as `/gamemode creative`.
 
+### The main menu (keyboard and mouse)
+
+The menu is drawn on your **monitor**, over the Gorilla Tag window. It opens when Gorilla Tag
+starts (turn that off in Settings). Click into the Gorilla Tag window first so it has keyboard
+focus.
+
+| Key | |
+|---|---|
+| **F1** | Open / close the menu |
+| **Mouse** | Hover to highlight, click to choose |
+| **↑ / ↓** (or Tab) | Move |
+| **Enter** | Choose |
+| **← / →** | Change the highlighted setting |
+| **Esc** | Back (closes the menu on the first page) |
+| **Delete** | Forget the highlighted server (Multiplayer page) |
+| Typing | Goes into the highlighted text box (world name, server address) |
+
+The top of the menu shows whether Minecraft is connected, which world or server it's in, whether
+you're in the map, and Minecraft's latest message.
+
+- **Enter / Leave the Minecraft map:** same as holding B + Y.
+- **Singleplayer worlds:** your worlds in the GorillaCraft instance, most recent first. Choose one
+  to switch to it. Type a name under **New world** and press Enter to create a new creative world
+  and play in it. (The world that's open right now isn't listed.)
+- **Multiplayer:** type a server address (`play.example.com`, `123.45.67.89:25565`, ...) and press
+  Enter, or choose one you joined before. See [section 8](#8-multiplayer-playing-with-friends-on-a-server).
+- **Leave the current world:** saves and goes back to Minecraft's title screen.
+- **Settings:** enter the map automatically, fist mode, punch speed, mining per punch, hand
+  reach, block size (after a restart), starting Minecraft with Gorilla Tag, and opening the menu
+  at start. Changes apply straight away and are saved.
+
+Switching worlds or servers takes you out of the map while Minecraft loads, then back in.
+
 ## 7. Settings
 
 ### Gorilla Tag: `BepInEx\config\dev.gorillacraft.cfg`
 
-Open it with Notepad while Gorilla Tag is closed.
+Most of these can be changed in the menu's **Settings** page. For the rest, open the file with
+Notepad while Gorilla Tag is closed.
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -184,7 +238,12 @@ Open it with Notepad while Gorilla Tag is closed.
 | `[Map] Anchor` | `0, 1500, 0` | Where Minecraft's spawn point is placed in Gorilla Tag's world. It's far above the Gorilla Tag maps so they don't overlap. |
 | `[Map] BlockScale` | `1` | Size of one Minecraft block in meters. Lower it (e.g. `0.6`) to make blocks smaller compared to your gorilla, raise it to make them bigger. |
 | `[Map] AutoEnter` | `true` | Put you into the Minecraft map as soon as Minecraft is ready. `false`: only when you hold B + Y. |
-| `[Hands] TouchDistance` | `0.12` | How close (meters) your hand has to be to a block for mining and using. Raise it if hits don't register, lower it if you hit blocks by accident. |
+| `[Hands] TouchDistance` | `0.12` | How close (meters) your hand has to be to a block for punching and using. Raise it if hits don't register, lower it if you hit blocks by accident. |
+| `[Hands] PunchSpeed` | `2.0` | How fast (m/s) a hand must hit a block to count as a punch. Lower: lighter taps break blocks. Higher: climbing never does. |
+| `[Hands] PunchHold` | `0.4` | Seconds Minecraft keeps mining after each punch. Higher: fewer punches for survival blocks. |
+| `[Hands] FistMode` | `false` | Only punches with grip held break blocks; the trigger right-clicks instead of the grip. |
+| `[Menu] OpenAtStart` | `true` | Show the menu when Gorilla Tag starts. F1 opens it any time. |
+| `[Menu] Servers` | *(empty)* | Servers you joined from the menu, separated by `;`. |
 | `[Performance] SectionsPerFrame` | `4` | How many 16×16×16 chunks of blocks are built per frame. Lower it if you get stutters while blocks load. |
 | `[Rendering] Shader` | `Universal Render Pipeline/Particles/Unlit` | Shader for blocks. Only change it if blocks look wrong (see [Troubleshooting](#10-troubleshooting)). |
 | `[Minecraft] AutoInstall` | `true` | Create/update the GorillaCraft instance in Prism when Gorilla Tag starts. |
@@ -206,26 +265,65 @@ In the instance folder: in Prism, right-click **GorillaCraft → Folder**, then 
 
 Minecraft only sends what it has loaded, so keep its own render distance at least `radius`.
 
-## 8. Playing with friends
+## 8. Multiplayer: playing with friends on a server
 
-Everyone needs **their own** Minecraft (with GorillaCraft) and Gorilla Tag (with GorillaCraft).
-Only the Minecraft world is shared, through Minecraft's normal multiplayer:
+**Yes, you can run a normal Minecraft server for this.** Everyone plays on that server, and
+blocks one player breaks or places show up for everyone, in Minecraft and in Gorilla Tag.
 
-1. **One player hosts the Minecraft world:** in the Minecraft window, Esc → **Open to LAN**, or
-   run a Fabric 26.3 server with `gorillacraft-fabric-0.2.0+26.3.jar` (from the release) and
-   Fabric API in its `mods` folder.
-2. **Everyone else joins that Minecraft world or server** in their own Minecraft (the
-   GorillaCraft instance), from Minecraft's Multiplayer menu.
-   (Over the internet you need a server, port forwarding, or a tunnelling mod.)
-3. **Everyone joins the same private Gorilla Tag room** (same room code), or the same modded
-   lobby if you all have Utilla.
+Each player still needs their **own** Gorilla Tag with GorillaCraft and their **own** Minecraft
+(the GorillaCraft instance that the plugin sets up). The server is just where the Minecraft world
+lives.
 
-The Minecraft world's spawn point anchors the map, so with the same `Anchor` and `BlockScale`
-settings everyone stands on the same blocks in Gorilla Tag. Blocks one player breaks or places show
-up for everyone.
+### 8.1 Set up the server (one person)
 
-Without GorillaCraft on a Minecraft server, gorillas still work, but the server may pull you back
-when you climb on block edges.
+You need [Java 25](https://adoptium.net/) on the server PC.
+
+1. Make a new folder, e.g. `C:\GorillaCraftServer`.
+2. Get the Fabric server launcher from [fabricmc.net/use/server](https://fabricmc.net/use/server/):
+   Minecraft **26.3**, the newest loader, then **Executable Server (.jar)**. Save it into the folder.
+3. Open a terminal in the folder (Shift + right-click → **Open in Terminal**) and run it once:
+   ```
+   java -Xmx2G -jar fabric-server-mc.26.3-loader.0.19.5-launcher.jar nogui
+   ```
+   (use the actual file name). It downloads Minecraft, creates its files and stops because of
+   the EULA.
+4. Open `eula.txt`, change `eula=false` to `eula=true`, save.
+5. Put **two jars** into the new `mods` folder:
+   - **Fabric API** for 26.3, from [Modrinth](https://modrinth.com/mod/fabric-api)
+   - `gorillacraft-fabric-0.3.0+26.3.jar` from the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)
+6. Optional, in `server.properties`:
+   - `gamemode=creative` (and `force-gamemode=true`) for building, or leave survival
+   - `difficulty=peaceful` if you don't want mobs attacking gorillas
+   - `spawn-protection=0`, so everyone can build near spawn
+7. Start it again with the same command. It's ready when it prints `Done`.
+8. If friends join over the internet, forward **TCP port 25565** on your router to this PC, and
+   allow Java through Windows Firewall when it asks. On the same network, nobody needs that.
+
+GorillaCraft on the server is what lets gorillas climb freely; without it the server pulls players
+back when they hug block edges. The server doesn't need Gorilla Tag.
+
+### 8.2 Join it (everyone)
+
+1. Start Gorilla Tag. The GorillaCraft menu is on your monitor (F1 if it's closed).
+2. **Multiplayer** → type the server's address → **Enter**:
+   - the server PC itself: `localhost`
+   - same home network: the server PC's local IP, e.g. `192.168.1.20`
+   - over the internet: the host's public IP or domain, e.g. `123.45.67.89`
+     (add `:port` if it isn't 25565)
+3. Minecraft leaves its singleplayer world and joins the server, and you're dropped into the
+   server's world in Gorilla Tag.
+4. **Everyone joins the same private Gorilla Tag room** (same room code) so you can see each other
+   as gorillas. Or join the same modded lobby if you all have Utilla.
+
+The server remembers each player's Minecraft position, so you come back where you left off.
+Everyone needs the same `Anchor` and `BlockScale` settings (the defaults are fine) so the gorillas
+line up on the same blocks.
+
+### Quick alternative: Open to LAN
+
+For a quick game on one home network, one player can open their singleplayer world in the
+Minecraft window: Esc → **Open to LAN** → **Start LAN World**. Others join with
+`<that PC's IP>:<the port Minecraft shows in chat>` from the GorillaCraft menu.
 
 ## 9. Performance tips
 
@@ -251,11 +349,15 @@ Gorilla Tag in VR needs steady frame rates. Minecraft running in the background 
 |---|---|
 | Nothing about GorillaCraft in `LogOutput.log` | BepInEx isn't running (no `LogOutput.log` at all?), or the dll is in the wrong place. It must be in `BepInEx\plugins\GorillaCraft\`. Unblock it (section 4). |
 | `Skipping [GorillaCraft ...] because a newer version exists` | There are two copies of `GorillaCraft.dll`. Keep only `BepInEx\plugins\GorillaCraft\GorillaCraft.dll`. |
-| `Could not load [GorillaCraft 0.1.0] because it has missing dependencies: ...utilla` | That's the old 0.1.0, which needed Utilla. Install 0.2.0. |
+| `Could not load [GorillaCraft 0.1.0] because it has missing dependencies: ...utilla` | That's the old 0.1.0, which needed Utilla. Install the newest release. |
 | Wrist: "Prism Launcher not found" | Install Prism (section 3). If it's a portable copy or on another drive, set `PrismPath` (and maybe `PrismDataDir`). |
 | Wrist: "prismlauncher.exe not found" | Set `PrismPath` to the full path of `prismlauncher.exe`. |
 | Prism opens but Minecraft doesn't start | Add your Microsoft account in Prism (**Settings → Accounts**). Start the **GorillaCraft** instance from Prism once by hand to see the error. |
 | Minecraft starts but stays on the title screen | The world couldn't be opened. Open any world yourself; GorillaCraft uses it. Check that the instance's JVM arguments (Prism: **Edit → Settings → Java**) still contain `-Dgorillacraft.autoWorld=GorillaCraft`. |
+| Menu doesn't react to keys | Click into the Gorilla Tag window on your monitor first, so it has keyboard focus. F1 toggles the menu. |
+| Climbing breaks blocks in creative | Raise `Punch speed` in the menu, or turn on fist mode. |
+| Punches don't break anything | Hit faster, or lower `Punch speed`. In survival, keep punching: each punch mines for `Mining per punch` seconds. Check the white highlight: your hand has to be on the block. |
+| "Couldn't join" / "Connection Lost" on the wrist or menu | Wrong address, the server is off, or the port isn't forwarded. The Minecraft window shows the full reason. The server must run Minecraft 26.3 with Fabric. |
 | Wrist dot stays red | Minecraft isn't running with the mod, or the ports differ. Minecraft's log should say `Waiting for Gorilla Tag on 127.0.0.1:47123`. If it says the port is in use, pick another port in **both** settings files. |
 | Wrist says "Open a Minecraft world" | Minecraft is connected but on the title screen. Open a world. |
 | "GorillaCraft is off in public lobbies" | You're in a public room. Leave it, or use a private room code. |
@@ -263,7 +365,7 @@ Gorilla Tag in VR needs steady frame rates. Minecraft running in the background 
 | Blocks are **pink/magenta** or invisible | The block shader isn't available in your Gorilla Tag version. In `dev.gorillacraft.cfg` set `Shader = Sprites/Default` and restart. Also check the log line `Block shader: ...`. |
 | Blocks are white/untextured | The block texture hasn't arrived from Minecraft yet. Check Minecraft's log for `Block atlas exported`. If you change resource packs in Minecraft, restart Gorilla Tag so it picks up the new textures. |
 | Leaves or glass look solid / water isn't see-through | Your Gorilla Tag build lacks that shader variant. Try `Shader = Sprites/Default`. |
-| Mining/placing doesn't register | Raise `TouchDistance` to `0.18`. Make sure Minecraft isn't on a menu or the death screen. In survival, placing needs the block in your hotbar and selected. |
+| Placing/using doesn't register | Raise `TouchDistance` to `0.18`. Make sure Minecraft isn't on a menu or the death screen. In survival, placing needs the block in your hotbar and selected. |
 | Blocks get placed "inside" you or not at all next to your body | Your Minecraft player's body is where the gorilla is, and Minecraft won't place blocks into it. Reach a little further out. |
 | A chest opens and closes immediately | Container screens aren't supported yet. Use the Minecraft window. |
 | You keep getting pulled back when climbing on a server | Install GorillaCraft (and Fabric API) on the server too. |
@@ -276,7 +378,7 @@ log files.
 
 **Updating:** replace `BepInEx\plugins\GorillaCraft\GorillaCraft.dll` with the one from the new
 release. The next time Gorilla Tag starts, it updates the mod in the GorillaCraft Prism instance
-too. Your settings and worlds are kept. Update servers by hand with the new jar.
+too. Your settings and worlds are kept. Update servers by hand with the new jar from the release (and restart them).
 
 **Uninstalling:**
 

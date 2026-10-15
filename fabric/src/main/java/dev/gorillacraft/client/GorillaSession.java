@@ -36,6 +36,7 @@ public final class GorillaSession {
 	private final ClientConfig cfg;
 	private final SectionStreamer streamer = new SectionStreamer();
 	private final AtlasExporter atlas = new AtlasExporter();
+	private final MenuActions menu;
 
 	private int connection;
 	private ClientLevel worldSentFor;
@@ -65,6 +66,7 @@ public final class GorillaSession {
 	GorillaSession(LinkServer link, ClientConfig cfg) {
 		this.link = link;
 		this.cfg = cfg;
+		this.menu = new MenuActions(link, this::status);
 	}
 
 	/** True while Gorilla Tag is moving the Minecraft player. */
@@ -90,11 +92,13 @@ public final class GorillaSession {
 			}
 		}
 
+		menu.tick(mc);
+
 		ClientLevel level = mc.level;
 		LocalPlayer player = mc.player;
 		if (level == null || player == null) {
 			if (!noWorldSent) {
-				link.send(new FrameWriter(Proto.MC_WORLD).u8(0).str("").i32(0).i32(0).i32(0).i32(0).i32(0).finish());
+				link.send(new FrameWriter(Proto.MC_WORLD).u8(0).str("").i32(0).i32(0).i32(0).i32(0).i32(0).str("").finish());
 				status("Open a Minecraft world (or join a server) to load the map");
 				noWorldSent = true;
 				worldSentFor = null;
@@ -113,7 +117,7 @@ public final class GorillaSession {
 			link.send(new FrameWriter(Proto.MC_WORLD)
 					.u8(1).str(level.dimension().identifier().toString())
 					.i32(origin.getX()).i32(origin.getY()).i32(origin.getZ())
-					.i32(level.getMinY()).i32(level.getMaxY()).finish());
+					.i32(level.getMinY()).i32(level.getMaxY()).str(worldLabel(mc)).finish());
 			status("Connected to " + (mc.isLocalServer() ? "singleplayer world" : "server"));
 			if (inMap) {
 				sendTeleport(player);
@@ -211,8 +215,21 @@ public final class GorillaSession {
 					mc.player.getInventory().setSelectedSlot(slot);
 				}
 			}
+			case Proto.GT_LIST_WORLDS -> menu.listWorlds(mc);
+			case Proto.GT_OPEN_WORLD -> menu.openWorld(mc, m.str());
+			case Proto.GT_JOIN_SERVER -> menu.joinServer(mc, m.str());
+			case Proto.GT_LEAVE_WORLD -> menu.leave(mc);
 			default -> GorillaCraft.LOG.warn("Unknown message 0x{} from Gorilla Tag", Integer.toHexString(m.type));
 		}
+	}
+
+	/** "World name" in singleplayer, the server's address in multiplayer. */
+	private static String worldLabel(Minecraft mc) {
+		if (mc.getSingleplayerServer() != null) {
+			return mc.getSingleplayerServer().getWorldData().getLevelName();
+		}
+		var server = mc.getCurrentServer();
+		return server != null ? server.ip : "server";
 	}
 
 	/** Called from LocalPlayer.tick (HEAD), before the player's movement is sent to the server. */

@@ -19,16 +19,22 @@ Tag features aren't in yet. This is interactions and maps only.
   with Minecraft's own block models and textures (stairs, fences, leaves, water, biome colours,
   smooth lighting), and its collision shapes are real Gorilla Tag colliders you can climb.
   Blocks stream in around you as you move (4 chunks by default).
-- **Mining:** hold the **trigger** with a hand on a block. Breaking speed, tools and drops are
-  Minecraft's. Creative breaks instantly, like in Minecraft.
-- **Using:** press **grip** with a hand on a block to right-click it with your held item. That
-  places blocks, opens doors and trapdoors, presses buttons and flips levers.
+- **Mining:** punch a block. Each punch keeps Minecraft mining it for a moment, so creative
+  breaks in one hit and survival takes as many punches as Minecraft's break time. Tools and drops
+  are Minecraft's. Optional fist mode: only punches with grip held count, so climbing never
+  breaks blocks.
+- **Using:** press **grip** with a hand on a block to right-click it with your held item (the
+  trigger, in fist mode). That places blocks, opens doors and trapdoors, presses buttons and
+  flips levers.
+- **Main menu** on your monitor (F1), with mouse and keyboard: pick or create a singleplayer
+  world, join a server, enter or leave the map, change settings.
 - **Hotbar:** **A** = next slot, **X** = previous slot. The hotbar and status are on your left
   wrist.
 - **Live changes:** anything that changes in Minecraft (you, other players, redstone, water,
   explosions) updates in Gorilla Tag.
-- **Playing together:** gorillas whose Minecraft is on the same server share the world. They
-  line up in Gorilla Tag too, because the map is anchored at the Minecraft world's spawn point.
+- **Multiplayer:** run a Fabric 26.3 server with GorillaCraft and Fabric API, and everyone joins
+  it from the menu. Gorillas on the same server share the world, and they line up in Gorilla Tag
+  too, because the map is anchored at the Minecraft world's spawn point.
 
 **Windows players: follow the [step-by-step Windows guide](docs/WINDOWS-GUIDE.md).** Downloads are on the [releases page](https://github.com/easyax2/gorillacraft/releases).
 
@@ -66,7 +72,9 @@ Gorilla Tag: `BepInEx/config/dev.gorillacraft.cfg`
 | `Map.AutoEnter` | `true` | Enter the map as soon as Minecraft is ready |
 | `Minecraft.AutoInstall` / `AutoLaunch` | `true` / `true` | Set up / start the GorillaCraft Prism instance |
 | `Minecraft.PrismPath` / `PrismDataDir` / `World` | | Where Prism is, and which world opens |
-| `Hands.TouchDistance` | `0.12` | How close a hand must be to a block to mine or use it |
+| `Hands.TouchDistance` | `0.12` | How close a hand must be to a block to punch or use it |
+| `Hands.PunchSpeed` / `PunchHold` / `FistMode` | `2.0` / `0.4` / `false` | What counts as a punch, how long each punch mines, fist mode |
+| `Menu.OpenAtStart` / `Servers` | `true` / | Show the menu at start; servers joined from it |
 | `Performance.SectionsPerFrame` | `4` | Mesh/collider builds per frame |
 | `Rendering.Shader` | `Universal Render Pipeline/Particles/Unlit` | Block shader (falls back to `Sprites/Default`) |
 

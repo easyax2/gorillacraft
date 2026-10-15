@@ -33,6 +33,10 @@ public final class ClientConfig {
 			}
 		}
 		c.port = intProp(p, "port", c.port);
+		String envPort = System.getenv("GORILLACRAFT_PORT"); // overrides the file, e.g. for tests or a second instance
+		if (envPort != null && envPort.matches("\\d+")) {
+			c.port = Integer.parseInt(envPort);
+		}
 		c.radius = Math.clamp(intProp(p, "radius", c.radius), 1, 16);
 		c.verticalRadius = Math.clamp(intProp(p, "verticalRadius", c.verticalRadius), 1, 24);
 		c.sectionsPerTick = Math.clamp(intProp(p, "sectionsPerTick", c.sectionsPerTick), 1, 64);
