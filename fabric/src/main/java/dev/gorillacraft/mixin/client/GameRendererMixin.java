@@ -19,6 +19,15 @@ abstract class GameRendererMixin {
 		}
 	}
 
+	/** After the whole frame (GUI included): the inventory/chest panel. */
+	@Inject(method = "render", at = @At("TAIL"))
+	private void gorillacraft$guiDone(CallbackInfo ci) {
+		GorillaSession session = GorillaCraftClient.session();
+		if (session != null) {
+			session.onFrameFinished();
+		}
+	}
+
 	/** Right after the world is drawn, before anything else (GUI, screens) reuses the depth buffer. */
 	@Inject(method = "renderLevel", at = @At("TAIL"))
 	private void gorillacraft$frameDone(CallbackInfo ci) {

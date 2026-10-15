@@ -38,6 +38,12 @@ public final class GorillaSession {
 	private final AtlasExporter atlas = new AtlasExporter();
 	private final MenuActions menu;
 	private final FrameCapture frames;
+	private final GuiCapture gui;
+	private int pointerButtons;
+	private String lastHeld = "";
+	private int savedFps;
+	private boolean savedVsync;
+	private net.minecraft.client.InactivityFpsLimit savedInactivity;
 	/** What Gorilla Tag asked for in its hello (Proto.WANT_*). */
 	private int wants = Proto.WANT_BLOCK_MESHES;
 	private boolean overlayWasActive;
@@ -78,6 +84,7 @@ public final class GorillaSession {
 		this.cfg = cfg;
 		this.menu = new MenuActions(link, this::status);
 		this.frames = new FrameCapture(link, cfg);
+		this.gui = new GuiCapture(link);
 	}
 
 	/** True while Gorilla Tag is moving the Minecraft player. */
@@ -159,6 +166,7 @@ public final class GorillaSession {
 
 	private void onConnectionChanged(int cid) {
 		connection = cid;
+		lastHeld = "\u0000";
 		wants = Proto.WANT_BLOCK_MESHES;
 		worldSentFor = null;
 		noWorldSent = false;
@@ -240,6 +248,13 @@ public final class GorillaSession {
 			case Proto.GT_OPEN_WORLD -> menu.openWorld(mc, m.str());
 			case Proto.GT_JOIN_SERVER -> menu.joinServer(mc, m.str());
 			case Proto.GT_LEAVE_WORLD -> menu.leave(mc);
+			case Proto.GT_INVENTORY -> toggleInventory(mc, m.u8() != 0);
+			case Proto.GT_POINTER -> pointer(mc, m.f32(), m.f32(), m.u8());
+			case Proto.GT_SCROLL -> {
+				float dy = m.f32();
+				var w = mc.getWindow();
+				mc.mouseHandler.onScroll(w.handle(), 0, dy);
+			}
 			default -> GorillaCraft.LOG.warn("Unknown message 0x{} from Gorilla Tag", Integer.toHexString(m.type));
 		}
 	}
@@ -282,6 +297,55 @@ public final class GorillaSession {
 		return cfg.overlayFov;
 	}
 
+	/** Called after every finished frame (GUI included). */
+	public void onFrameFinished() {
+		Minecraft mc = Minecraft.getInstance();
+		gui.capture(mc, driving() && mc.gui.screen() != null);
+	}
+
+	/**
+	 * Opens or closes Minecraft's inventory (creative or survival: Minecraft picks), or closes
+	 * whatever screen is open (a chest, a crafting table...).
+	 */
+	private void toggleInventory(Minecraft mc, boolean open) {
+		LocalPlayer player = mc.player;
+		if (player == null || !driving()) {
+			return;
+		}
+		if (mc.gui.screen() != null) {
+			if (!open) {
+				mc.gui.screen().onClose();
+			}
+			return;
+		}
+		if (open) {
+			mc.gui.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(player));
+		}
+	}
+
+	/**
+	 * Gorilla Tag's laser pointer on the panel: u/v across Minecraft's window (0..1 from the top
+	 * left) and the buttons held (bit 0 left, bit 1 right). Goes through Minecraft's own mouse
+	 * handling, so clicking, dragging and shift-free item moving work as with a real mouse.
+	 */
+	private void pointer(Minecraft mc, float u, float v, int buttons) {
+		if (mc.gui.screen() == null) {
+			pointerButtons = 0;
+			return;
+		}
+		var window = mc.getWindow();
+		double x = Math.clamp(u, 0f, 1f) * window.getScreenWidth();
+		double y = Math.clamp(v, 0f, 1f) * window.getScreenHeight();
+		mc.mouseHandler.onMove(window.handle(), x, y, 0, 0);
+		for (int b = 0; b < 2; b++) {
+			boolean now = (buttons & 1 << b) != 0, was = (pointerButtons & 1 << b) != 0;
+			if (now != was) {
+				mc.mouseHandler.onButton(window.handle(), new net.minecraft.client.input.MouseButtonInfo(b, 0), now ? 1 : 0);
+			}
+		}
+		pointerButtons = buttons;
+	}
+
 	/** Called after every rendered frame. */
 	public void onFrameRendered() {
 		if (overlayActive() && frames.capture(Minecraft.getInstance(), cameraEye()) && stereo()) {
@@ -295,11 +359,22 @@ public final class GorillaSession {
 	 */
 	private void updateOverlay(Minecraft mc) {
 		boolean active = overlayActive();
+		if (active) {
+			mc.getFramerateLimitTracker().onInputReceived();
+		}
 		if (active == overlayWasActive) {
 			return;
 		}
 		overlayWasActive = active;
 		if (active) {
+			// Minecraft's frames are what you see: no frame cap, no vsync, and no slowing down
+			// because nobody has touched its window for a while.
+			savedFps = mc.options.framerateLimit().get();
+			savedVsync = mc.options.enableVsync().get();
+			savedInactivity = mc.options.inactivityFpsLimit().get();
+			mc.options.framerateLimit().set(260);
+			mc.options.enableVsync().set(false);
+			mc.options.inactivityFpsLimit().set(net.minecraft.client.InactivityFpsLimit.MINIMIZED);
 			savedHideGui = mc.gui.hud.isHidden();
 			savedBobView = mc.options.bobView().get();
 			if (!savedHideGui) {
@@ -307,6 +382,9 @@ public final class GorillaSession {
 			}
 			mc.options.bobView().set(false);
 		} else {
+			mc.options.framerateLimit().set(savedFps);
+			mc.options.enableVsync().set(savedVsync);
+			mc.options.inactivityFpsLimit().set(savedInactivity);
 			if (mc.gui.hud.isHidden() != savedHideGui) {
 				mc.gui.hud.toggle();
 			}
@@ -440,10 +518,6 @@ public final class GorillaSession {
 			return;
 		}
 		respawnCooldown = 0;
-		if (mc.gui.screen() instanceof AbstractContainerScreen<?>) {
-			player.closeContainer();
-			status("Containers can't be opened from Gorilla Tag yet");
-		}
 	}
 
 	private void tickHotbar(LocalPlayer player) {
@@ -462,6 +536,47 @@ public final class GorillaSession {
 			lastHotbar = k;
 			link.send(w.finish());
 		}
+		sendHeldItem(player.getMainHandItem());
+	}
+
+	/**
+	 * The held item's texture, for Gorilla Tag to put in the gorilla's hand: the item's own
+	 * texture, or for blocks the block's texture (side, then top, for blocks like grass and logs).
+	 */
+	private void sendHeldItem(ItemStack stack) {
+		String id = stack.isEmpty() ? "" : net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+		if (id.equals(lastHeld)) {
+			return;
+		}
+		lastHeld = id;
+		FrameWriter w = new FrameWriter(Proto.MC_HELD);
+		if (stack.isEmpty()) {
+			link.send(w.u8(0).i32(0).finish());
+			return;
+		}
+		var rm = Minecraft.getInstance().getResourceManager();
+		net.minecraft.resources.Identifier key = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem());
+		java.util.List<String> tries = new java.util.ArrayList<>();
+		boolean block = stack.getItem() instanceof net.minecraft.world.item.BlockItem;
+		if (block) {
+			var b = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(((net.minecraft.world.item.BlockItem) stack.getItem()).getBlock());
+			for (String suffix : new String[] {"", "_side", "_top", "_front", "_0"}) {
+				tries.add(b.getNamespace() + ":textures/block/" + b.getPath() + suffix + ".png");
+			}
+		}
+		tries.add(key.getNamespace() + ":textures/item/" + key.getPath() + ".png");
+		for (String t : tries) {
+			var res = rm.getResource(net.minecraft.resources.Identifier.parse(t));
+			if (res.isPresent()) {
+				try (var in = res.get().open()) {
+					byte[] png = in.readAllBytes();
+					link.send(w.u8(block && !t.contains("/item/") ? 2 : 1).i32(png.length).bytes(png).finish());
+					return;
+				} catch (java.io.IOException ignored) {
+				}
+			}
+		}
+		link.send(w.u8(0).i32(0).finish());
 	}
 
 	private void status(String text) {

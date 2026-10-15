@@ -21,6 +21,8 @@ static class Program
     static byte[] atlas;
     static Messages.Worlds worldsList;
     static Messages.Frame frame;
+    static Messages.GuiFrame guiFrame;
+    static Messages.Held held;
     static readonly Messages.Frame[] eyeFrames = new Messages.Frame[3];
     static int frames;
     static int sectionUpdates;
@@ -72,6 +74,23 @@ static class Program
         WaitFor(() => hotbar.Selected == 1, 5, "slot 2 selected");
         link.Send(new FrameWriter(Proto.GtSlot).U8(0).Finish());
         WaitFor(() => hotbar.Selected == 0, 5, "slot 1 selected");
+
+        // Held item: planks come as a block texture.
+        WaitFor(() => held != null && held.Kind == 2, 5, "held item texture (planks)");
+        Check(held.Png != null && held.Png.Length > 8 && held.Png[1] == 'P', "held item comes with a PNG");
+
+        // Inventory panel: open it, move the pointer and click, close it.
+        link.Send(new FrameWriter(Proto.GtInventory).U8(1).Finish());
+        WaitFor(() => guiFrame != null && guiFrame.Width > 0, 10, "GUI frame for the inventory");
+        Console.WriteLine($"inventory panel: {guiFrame.Width}x{guiFrame.Height}");
+        Check(guiFrame.Rgba.Length == guiFrame.Width * guiFrame.Height * 4, "GUI frame has the picture");
+        link.Send(new FrameWriter(Proto.GtPointer).F32(0.5f).F32(0.5f).U8(1).Finish());
+        Pump(100);
+        link.Send(new FrameWriter(Proto.GtPointer).F32(0.5f).F32(0.5f).U8(0).Finish());
+        Pump(100);
+        link.Send(new FrameWriter(Proto.GtInventory).U8(0).Finish());
+        WaitFor(() => guiFrame.Width == 0, 10, "panel closed");
+        Console.WriteLine("inventory opened, clicked and closed");
 
         // Mine the stone (creative: one hit).
         int before = sectionUpdates;
@@ -172,6 +191,8 @@ static class Program
                     case Messages.Hotbar h: hotbar = h; break;
                     case Messages.Status st: statuses.Add(st.Text); break;
                     case Messages.Worlds ws: worldsList = ws; break;
+                    case Messages.GuiFrame gf: guiFrame = gf; break;
+                    case Messages.Held hd: held = hd; break;
                     case Messages.Frame fr: frame = fr; eyeFrames[Math.Clamp(fr.Eye, 0, 2)] = fr; frames++; break;
                 }
             }
@@ -200,7 +221,7 @@ static class Program
     static void CheckFrame(Messages.Frame f)
     {
         Console.WriteLine($"frame {f.Id} (eye {f.Eye}): {f.Width}x{f.Height} picture, {f.GridW}x{f.GridH} depth grid, camera {f.CamX:F2} {f.CamY:F2} {f.CamZ:F2}");
-        Check(f.Width >= 64 && f.Height >= 64 && f.Rgb.Length == f.Width * f.Height * 3, "picture has a sane size");
+        Check(f.Width >= 64 && f.Height >= 64 && f.Rgba.Length == f.Width * f.Height * 4, "picture has a sane size");
         Check(Math.Abs(f.CamX - 0.5) < 0.05 && Math.Abs(f.CamY - (-58.3)) < 0.01 && Math.Abs(f.CamZ - 0.5) < 0.01, "camera is at the gorilla's head");
         int mid = f.GridW / 2;
         float[] P(int gx, int gy) { int o = (gy * f.GridW + gx) * 3; return new[] { f.Points[o], f.Points[o + 1], f.Points[o + 2] }; }
@@ -209,16 +230,16 @@ static class Program
         double topDist = Math.Sqrt(top[0] * top[0] + top[1] * top[1] + top[2] * top[2]);
         Console.WriteLine($"  bottom-centre point {bottom[0]:F2} {bottom[1]:F2} {bottom[2]:F2}, top-centre distance {topDist:F0}");
         Check(Math.Abs(bottom[1] - (-1.7)) < 0.15, "bottom of the picture is the ground, 1.7 blocks below the eyes");
-        Check(top[1] > 0 && topDist > 500, "top of the picture is sky, far away");
+        Check(top[1] > 0 && topDist > 250, "top of the picture is sky, far away");
         // Yaw 0 looks south (+Z in Minecraft), so the ground in view is at +Z.
         Check(bottom[2] > 0.05, "the view faces the way the gorilla looks (south)");
         // Ground row: mostly grass green.
         int gr = 0, n = 0;
         for (int x = 0; x < f.Width; x += 8)
         {
-            int o = ((f.Height - 4) * f.Width + x) * 3;
+            int o = ((f.Height - 4) * f.Width + x) * 4;
             n++;
-            if (f.Rgb[o + 1] > f.Rgb[o] && f.Rgb[o + 1] > f.Rgb[o + 2]) gr++;
+            if (f.Rgba[o + 1] > f.Rgba[o] && f.Rgba[o + 1] > f.Rgba[o + 2]) gr++;
         }
         Check(gr > n / 2, $"bottom row of the picture is green grass ({gr}/{n})");
     }

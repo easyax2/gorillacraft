@@ -12,7 +12,12 @@ import dev.gorillacraft.link.LinkServer;
 import dev.gorillacraft.link.Proto;
 import dev.gorillacraft.mixin.client.CameraAccess;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -31,40 +36,60 @@ import org.joml.Vector4f;
  * (reading the GPU depth buffer back doesn't work on 26.3's renderer). Gorilla Tag stretches the
  * picture over those points, so it sits in the world with real depth instead of being a flat
  * screen.
+ *
+ * Two frames can be on their way at once (one being copied/ray-cast while the other is sent),
+ * so the frame rate isn't limited by the round trip.
  */
 final class FrameCapture {
-	/** Where sky pixels are put, in blocks from the camera. */
-	private static final float SKY_DISTANCE = 600f;
+	/** Where sky pixels are put, in blocks from the camera (inside Gorilla Tag's far plane). */
+	private static final float SKY_DISTANCE = 300f;
+	private static final int SLOTS = 2;
+	private static final int RAY_THREADS = Math.max(2, Math.min(8, Runtime.getRuntime().availableProcessors() / 2));
 
 	private final LinkServer link;
 	private final ClientConfig cfg;
-
-	private GpuBuffer colorBuffer;
-	private float[] points = new float[0];
-	private int gridW, gridH;
-	private int bufferWidth;
-	private int bufferHeight;
-	private boolean busy;
-	private boolean failed;
-	private int frameId;
-	private static final int RAY_THREADS = Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 4));
-	private final java.util.concurrent.ExecutorService rayThread = java.util.concurrent.Executors.newFixedThreadPool(RAY_THREADS + 1, r -> {
+	private final Slot[] slots = new Slot[SLOTS];
+	private final ExecutorService rayPool = Executors.newFixedThreadPool(RAY_THREADS + SLOTS, r -> {
 		Thread t = new Thread(r, "GorillaCraft overlay rays");
 		t.setDaemon(true);
 		return t;
 	});
+	private boolean failed;
+	private int frameId;
 	private long rayNanos;
 	private int rayFrames;
+
+	/** One frame on its way: its GPU buffer and its grid of points. */
+	private static final class Slot {
+		GpuBuffer buffer;
+		int width, height;
+		float[] points = new float[0];
+		int gridW, gridH;
+		boolean busy;
+	}
 
 	FrameCapture(LinkServer link, ClientConfig cfg) {
 		this.link = link;
 		this.cfg = cfg;
+		for (int i = 0; i < SLOTS; i++) {
+			slots[i] = new Slot();
+		}
 	}
 
-	/** @return whether a frame was started (false: still busy with the last one, or nothing to grab). */
+	/** @return whether a frame was started (false: both slots busy, link backed up, or nothing to grab). */
 	boolean capture(Minecraft mc, int eye) {
-		if (busy || failed || link.pendingBytes() > 2L << 20) {
-			return false; // one frame in flight at a time; skip frames rather than queue them up
+		if (failed || link.pendingBytes() > 24L << 20) {
+			return false;
+		}
+		Slot slot = null;
+		for (Slot s : slots) {
+			if (!s.busy) {
+				slot = s;
+				break;
+			}
+		}
+		if (slot == null) {
+			return false;
 		}
 		RenderTarget target = mc.gameRenderer.mainRenderTarget();
 		GpuTexture color = target.getColorTexture();
@@ -75,12 +100,13 @@ final class FrameCapture {
 		int w = color.getWidth(0);
 		int h = color.getHeight(0);
 		GpuDevice device = RenderSystem.getDevice();
-		if (colorBuffer == null || w != bufferWidth || h != bufferHeight) {
-			closeBuffers();
-			int usage = GpuBuffer.USAGE_COPY_DST | GpuBuffer.USAGE_MAP_READ;
-			colorBuffer = device.createBuffer(() -> "GorillaCraft frame color", usage, (long) w * h * 4);
-			bufferWidth = w;
-			bufferHeight = h;
+		if (slot.buffer == null || w != slot.width || h != slot.height) {
+			if (slot.buffer != null) {
+				slot.buffer.close();
+			}
+			slot.buffer = device.createBuffer(() -> "GorillaCraft frame color", GpuBuffer.USAGE_COPY_DST | GpuBuffer.USAGE_MAP_READ, (long) w * h * 4);
+			slot.width = w;
+			slot.height = h;
 		}
 
 		// Snapshot the camera this frame was drawn with.
@@ -92,62 +118,52 @@ final class FrameCapture {
 		boolean zeroToOne = device.getDeviceInfo().isZZeroToOne();
 		float maxDistance = mc.options.getEffectiveRenderDistance() * 16;
 
-		// The rays run on their own thread (reading blocks only) while the GPU copies the picture;
-		// the frame goes out once both are done.
-		busy = true;
-		java.util.concurrent.CompletableFuture<Void> rays = java.util.concurrent.CompletableFuture.runAsync(() -> {
+		// Rays on worker threads (reading blocks only) while the GPU copies the picture; the frame
+		// goes out once both are done.
+		Slot s = slot;
+		s.busy = true;
+		CompletableFuture<Void> rays = CompletableFuture.runAsync(() -> {
 			long t0 = System.nanoTime();
-			castRays(level, pos, inverse, zeroToOne, w, h, maxDistance);
-			rayNanos += System.nanoTime() - t0;
-			if (++rayFrames == 300) {
-				GorillaCraft.LOG.info("Overlay: {}x{} frames, {}x{} depth rays take {} ms", w, h, gridW, gridH, rayNanos / rayFrames / 1_000_000);
-				rayNanos = 0;
-				rayFrames = 0;
+			castRays(s, level, pos, inverse, zeroToOne, w, h, maxDistance);
+			synchronized (this) {
+				rayNanos += System.nanoTime() - t0;
+				if (++rayFrames == 600) {
+					GorillaCraft.LOG.info("Overlay: {}x{} frames, {}x{} depth rays take {} ms on {} threads", w, h, s.gridW, s.gridH,
+							rayNanos / rayFrames / 1_000_000, RAY_THREADS);
+					rayNanos = 0;
+					rayFrames = 0;
+				}
 			}
-		}, rayThread);
+		}, rayPool);
 		try {
-			device.createCommandEncoder().copyTextureToBuffer(color, colorBuffer, 0,
+			device.createCommandEncoder().copyTextureToBuffer(color, s.buffer, 0,
 					() -> rays.whenComplete((v, e) -> mc.execute(() -> {
 						if (e != null) {
 							GorillaCraft.LOG.error("Overlay rays failed", e);
-							busy = false;
+							s.busy = false;
 						} else {
-							finish(w, h, pos, eye);
+							finish(s, pos, eye);
 						}
 					})), 0);
 		} catch (RuntimeException e) {
 			GorillaCraft.LOG.error("Can't read Minecraft's frame back for the overlay", e);
 			failed = true;
-			busy = false;
+			s.busy = false;
 			return false;
 		}
 		return true;
 	}
 
-	private void finish(int w, int h, Vec3 cam, int eye) {
-		try (GpuBufferSlice.MappedView cv = colorBuffer.map(true, false)) {
-			ByteBuffer colors = cv.data();
-
-			// Picture: downscaled to at most overlayWidth, rows top to bottom, RGB.
+	private void finish(Slot s, Vec3 cam, int eye) {
+		try (GpuBufferSlice.MappedView view = s.buffer.map(true, false)) {
+			int w = s.width, h = s.height;
 			int step = Math.max(1, (w + cfg.overlayWidth - 1) / cfg.overlayWidth);
-			int iw = w / step;
-			int ih = h / step;
-			FrameWriter out = new FrameWriter(Proto.MC_FRAME, iw * ih * 3 + points.length * 4 + 64);
+			int iw = w / step, ih = h / step;
+			FrameWriter out = new FrameWriter(Proto.MC_FRAME, iw * ih * 4 + s.points.length * 4 + 64);
 			out.i32(++frameId).u8(eye).f64(cam.x).f64(cam.y).f64(cam.z).i32(iw).i32(ih);
-			byte[] row = new byte[iw * 3];
-			for (int y = 0; y < ih; y++) {
-				int src = h - 1 - y * step; // GPU rows start at the bottom
-				for (int x = 0; x < iw; x++) {
-					int o = (src * w + x * step) * 4;
-					row[x * 3] = colors.get(o);
-					row[x * 3 + 1] = colors.get(o + 1);
-					row[x * 3 + 2] = colors.get(o + 2);
-				}
-				out.bytes(row);
-			}
-
-			out.i32(gridW).i32(gridH);
-			for (float f : points) {
+			writeRows(out, view.data(), w, h, step);
+			out.i32(s.gridW).i32(s.gridH);
+			for (float f : s.points) {
 				out.f32(f);
 			}
 			link.send(out.finish());
@@ -155,12 +171,25 @@ final class FrameCapture {
 			GorillaCraft.LOG.error("Reading Minecraft's frame back failed", e);
 			failed = true;
 		} finally {
-			busy = false;
+			s.busy = false;
 		}
 	}
 
-	void reset() {
-		failed = false;
+	/** RGBA rows, top to bottom (the GPU's start at the bottom), downscaled by {@code step}. */
+	static void writeRows(FrameWriter out, ByteBuffer pixels, int w, int h, int step) {
+		int iw = w / step, ih = h / step;
+		byte[] row = new byte[iw * 4];
+		for (int y = 0; y < ih; y++) {
+			int src = (h - 1 - y * step) * w * 4;
+			if (step == 1) {
+				pixels.get(src, row, 0, row.length);
+			} else {
+				for (int x = 0; x < iw; x++) {
+					pixels.get(src + x * step * 4, row, x * 4, 4);
+				}
+			}
+			out.bytes(row);
+		}
 	}
 
 	/**
@@ -168,27 +197,28 @@ final class FrameCapture {
 	 * blocks' visual shapes and fluids. Points are relative to the camera, Minecraft axes; misses
 	 * (sky) go far away.
 	 */
-	private void castRays(ClientLevel level, Vec3 cam, Matrix4f inverse, boolean zeroToOne, int w, int h, float maxDistance) {
+	private void castRays(Slot s, ClientLevel level, Vec3 cam, Matrix4f inverse, boolean zeroToOne, int w, int h, float maxDistance) {
 		int gw = Math.max(2, cfg.overlayGrid);
 		int gh = Math.max(2, Math.round(gw * (float) h / w));
-		if (points.length != gw * gh * 3) {
-			points = new float[gw * gh * 3];
+		if (s.points.length != gw * gh * 3) {
+			s.points = new float[gw * gh * 3];
 		}
-		gridW = gw;
-		gridH = gh;
+		s.gridW = gw;
+		s.gridH = gh;
 		float ndcZ = zeroToOne ? 0.5f : 0f;
-		// Rows are split between a few threads; they only read blocks.
-		var parts = new java.util.ArrayList<java.util.concurrent.Future<?>>();
+		float reach = Math.min(maxDistance, SKY_DISTANCE);
+		// Rows are split between threads; they only read blocks.
+		List<Future<?>> parts = new ArrayList<>();
 		for (int t = 0; t < RAY_THREADS; t++) {
 			int from = gh * t / RAY_THREADS, to = gh * (t + 1) / RAY_THREADS;
-			Runnable rows = () -> castRows(level, cam, inverse, ndcZ, gw, gh, from, to, maxDistance);
+			Runnable rows = () -> castRows(s.points, level, cam, inverse, ndcZ, gw, gh, from, to, reach);
 			if (t == RAY_THREADS - 1) {
 				rows.run();
 			} else {
-				parts.add(rayThread.submit(rows));
+				parts.add(rayPool.submit(rows));
 			}
 		}
-		for (var f : parts) {
+		for (Future<?> f : parts) {
 			try {
 				f.get();
 			} catch (Exception e) {
@@ -197,7 +227,8 @@ final class FrameCapture {
 		}
 	}
 
-	private void castRows(ClientLevel level, Vec3 cam, Matrix4f inverse, float ndcZ, int gw, int gh, int fromRow, int toRow, float maxDistance) {
+	private static void castRows(float[] points, ClientLevel level, Vec3 cam, Matrix4f inverse, float ndcZ, int gw, int gh, int fromRow, int toRow,
+			float reach) {
 		Vector4f p = new Vector4f();
 		CollisionContext context = CollisionContext.empty();
 		int o = fromRow * gw * 3;
@@ -211,7 +242,7 @@ final class FrameCapture {
 				dx /= len;
 				dy /= len;
 				dz /= len;
-				Vec3 end = cam.add(dx * maxDistance, dy * maxDistance, dz * maxDistance);
+				Vec3 end = cam.add(dx * reach, dy * reach, dz * reach);
 				BlockHitResult hit = level.clip(new ClipContext(cam, end, ClipContext.Block.VISUAL, ClipContext.Fluid.ANY, context));
 				double dist = hit.getType() == HitResult.Type.MISS ? SKY_DISTANCE : hit.getLocation().distanceTo(cam);
 				points[o++] = (float) (dx * dist);
@@ -221,10 +252,7 @@ final class FrameCapture {
 		}
 	}
 
-	private void closeBuffers() {
-		if (colorBuffer != null) {
-			colorBuffer.close();
-			colorBuffer = null;
-		}
+	void reset() {
+		failed = false;
 	}
 }

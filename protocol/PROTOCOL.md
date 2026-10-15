@@ -1,4 +1,4 @@
-# GorillaCraft link protocol (version 4)
+# GorillaCraft link protocol (version 5)
 
 Loopback TCP. Minecraft listens on `127.0.0.1:47123` (configurable), Gorilla Tag connects and
 reconnects as needed. One Gorilla Tag at a time; a new connection replaces the old one.
@@ -28,6 +28,9 @@ Faces use Minecraft's `Direction` 3D data value: 0 down, 1 up, 2 north, 3 south,
 | 0x07 | OPEN_WORLD | `str id` — open that singleplayer world, or create it (creative, cheats on) if there's none; leaves the current world first |
 | 0x08 | JOIN_SERVER | `str address` — leave the current world, then connect |
 | 0x09 | LEAVE_WORLD | — save and quit to the title screen |
+| 0x0A | INVENTORY | `u8 open` — open the inventory, or (0) close whatever screen is open |
+| 0x0B | POINTER | `f32 u, f32 v (0..1 across Minecraft's window, from the top left), u8 buttons (bit 0 left, bit 1 right)` |
+| 0x0C | SCROLL | `f32 amount` |
 
 ## Minecraft → Gorilla Tag
 
@@ -42,6 +45,8 @@ Faces use Minecraft's `Direction` 3D data value: 0 down, 1 up, 2 north, 3 south,
 | 0x87 | HOTBAR | `u8 selected`, then 9 × `str name, u8 count` |
 | 0x88 | STATUS | `str text` |
 | 0x8A | FRAME | overlay picture, see below |
+| 0x8B | GUI_FRAME | `i32 width, height`, then width × height × RGBA: Minecraft's whole window while a screen is open; 0 × 0 = closed |
+| 0x8C | HELD | `u8 kind (0 nothing, 1 item, 2 block), i32 length, PNG` — the held item's texture |
 | 0x89 | WORLDS | `i32 n`, then n × `str id, str name` — singleplayer worlds, most recently played first (not the one that's open) |
 
 ### SECTION
@@ -71,10 +76,10 @@ i32 frameId
 u8 eye                         0 left, 1 right, 2 centre of the head
 f64 camX, camY, camZ          camera position the frame was drawn from
 i32 width, height
-width × height × (u8 r, g, b)  the picture, rows top to bottom
+width × height × (u8 r, g, b, a)  the picture, rows top to bottom
 i32 gridW, gridH
 gridW × gridH × (f32 x, y, z)  where each grid point of the picture is, relative to the camera
-                               (Minecraft axes), rows top to bottom; sky at 600 blocks
+                               (Minecraft axes), rows top to bottom; sky at 300 blocks
 ```
 
 Grid points are ray casts from the camera through the picture into Minecraft's blocks (visual

@@ -134,8 +134,11 @@ namespace GorillaCraft
 
             // Overlay mode shows Minecraft's own picture, so its window size is the overlay's
             // resolution: make it bigger than Minecraft's 854x480 default (once; the player may change it).
-            if (UpsertIni(cfg, "OverrideWindow", "true") | UpsertIni(cfg, "MinecraftWinWidth", "1600") | UpsertIni(cfg, "MinecraftWinHeight", "1000"))
+            if (UpsertIni(cfg, "OverrideWindow", "true") | UpsertIni(cfg, "MinecraftWinWidth", "1920") | UpsertIni(cfg, "MinecraftWinHeight", "1200"))
                 log.Append("set window size for the overlay; ");
+            // Instances set up by 0.4/0.5 got 1600x1000: raise that old default (not a size the player chose).
+            if (ReplaceIni(cfg, "MinecraftWinWidth", "1600", "1920") & ReplaceIni(cfg, "MinecraftWinHeight", "1000", "1200"))
+                log.Append("raised window size for a sharper overlay; ");
 
             string pack = Path.Combine(instance, "mmc-pack.json");
             if (!File.Exists(pack))
@@ -200,6 +203,18 @@ namespace GorillaCraft
                 return false;
             int general = lines.FindIndex(l => l.Trim() == "[General]");
             lines.Insert(general >= 0 ? general + 1 : 0, key + "=" + value);
+            File.WriteAllLines(file, lines);
+            return true;
+        }
+
+        /// <summary>Changes key=from to key=to in the instance.cfg.</summary>
+        private static bool ReplaceIni(string file, string key, string from, string to)
+        {
+            var lines = File.ReadAllLines(file);
+            int i = System.Array.IndexOf(lines, key + "=" + from);
+            if (i < 0)
+                return false;
+            lines[i] = key + "=" + to;
             File.WriteAllLines(file, lines);
             return true;
         }

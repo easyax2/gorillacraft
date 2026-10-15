@@ -13,8 +13,9 @@ namespace GorillaCraft
     ///   grip pressed with a hand on a block  → use the held item on it (place a block, open a
     ///                                          door, press a button, flip a lever, ...)
     ///   A / X                                → next / previous hotbar slot
-    /// A punch is a hand arriving at a block faster than <see cref="punchSpeed"/>. Gorilla
-    /// climbing slaps surfaces too, so slow climbing never counts; with <see cref="fistMode"/> only
+    /// A punch is a hand arriving at a block moving into it (towards the face it touches) faster
+    /// than <see cref="punchSpeed"/>; sliding along a surface doesn't count. Gorilla climbing slaps
+    /// surfaces too, so the default needs a real hit; with <see cref="fistMode"/> only
     /// a fist (grip held) punches, and the trigger becomes "use".
     /// </summary>
     public sealed class HandInteraction
@@ -33,7 +34,7 @@ namespace GorillaCraft
         private float mineUntil;
         private readonly bool[] wasTouching = new bool[2];
         private readonly Vector3[] lastHand = new Vector3[2];
-        private readonly float[] speed = new float[2];
+        private readonly Vector3[] velocity = new Vector3[2];
         private readonly bool[] gripWasDown = new bool[2];
         private readonly bool[] primaryWasDown = new bool[2];
         public int SelectedSlot;
@@ -64,12 +65,14 @@ namespace GorillaCraft
                 // so its speed is the punch speed.
                 Vector3 controller = player.GetControllerTransform(isLeft).position;
                 if (Time.deltaTime > 0f)
-                    speed[h] = Mathf.Lerp(speed[h], (controller - lastHand[h]).magnitude / Time.deltaTime, 0.5f);
+                    velocity[h] = Vector3.Lerp(velocity[h], (controller - lastHand[h]) / Time.deltaTime, 0.5f);
                 lastHand[h] = controller;
 
                 found[h] = BlockTargeting.Find(world, player.GetHandFollower(isLeft).position, reach, out targets[h]);
                 bool fist = !fistMode || ControllerInputPoller.GripFloat(isLeft ? XRNode.LeftHand : XRNode.RightHand) > 0.6f;
-                bool punched = fist && found[h] && !wasTouching[h] && speed[h] >= punchSpeed;
+                float scale = player.scale > 0f ? player.scale : 1f;
+                float into = found[h] ? Vector3.Dot(velocity[h], -FaceNormal(targets[h].Face)) / scale : 0f;
+                bool punched = fist && found[h] && !wasTouching[h] && into >= punchSpeed;
                 wasTouching[h] = found[h];
                 if (punched)
                     Punch(targets[h]);
@@ -111,6 +114,20 @@ namespace GorillaCraft
                 highlight.Show(world, targets[0], false);
             else
                 highlight.Hide();
+        }
+
+        /// <summary>The face's outward direction in Unity space (Minecraft north is Unity +Z).</summary>
+        private static Vector3 FaceNormal(Proto.Face f)
+        {
+            switch (f)
+            {
+                case Proto.Face.Up: return Vector3.up;
+                case Proto.Face.Down: return Vector3.down;
+                case Proto.Face.North: return Vector3.forward;
+                case Proto.Face.South: return Vector3.back;
+                case Proto.Face.West: return Vector3.left;
+                default: return Vector3.right;
+            }
         }
 
         private void Punch(BlockTarget t)

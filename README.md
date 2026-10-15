@@ -26,7 +26,7 @@ Tag features aren't in yet. This is interactions and maps only.
   invisible) Gorilla Tag colliders you can climb, streamed in around you (4 chunks by default).
   The older mode, where Gorilla Tag draws Minecraft's block meshes itself, is still there as
   `Rendering.Mode = Blocks`.
-- **Mining:** punch a block. Each punch keeps Minecraft mining it for a moment, so creative
+- **Mining:** punch a block (hard, straight into it). Each punch keeps Minecraft mining it for a moment, so creative
   breaks in one hit and survival takes as many punches as Minecraft's break time. Tools and drops
   are Minecraft's. Optional fist mode: only punches with grip held count, so climbing never
   breaks blocks.
@@ -36,7 +36,9 @@ Tag features aren't in yet. This is interactions and maps only.
 - **Main menu** on your monitor (F1), with mouse and keyboard: pick or create a singleplayer
   world, join a server, enter or leave the map, change settings.
 - **Hotbar:** **A** = next slot, **X** = previous slot. The hotbar and status are on your left
-  wrist.
+  wrist, and the held item is in your gorilla's hand.
+- **Inventory:** tap **Y**: Minecraft's own inventory (and chests, crafting tables, furnaces)
+  on a panel you point at and click with your right hand.
 - **Live changes:** anything that changes in Minecraft (you, other players, redstone, water,
   explosions) updates in Gorilla Tag.
 - **Multiplayer:** run a Fabric 26.3 server with GorillaCraft and Fabric API, and everyone joins

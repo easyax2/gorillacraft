@@ -21,11 +21,11 @@ public final class ClientConfig {
 	/** Sections meshed and sent per client tick at most. */
 	public int sectionsPerTick = 6;
 	/** Overlay mode: width the picture sent to Gorilla Tag is scaled down to (at most). */
-	public int overlayWidth = 1280;
+	public int overlayWidth = 2048;
 	/** Overlay mode: depth grid columns (rows follow the window's shape). */
-	public int overlayGrid = 128;
+	public int overlayGrid = 160;
 	/** Overlay mode: vertical field of view Minecraft renders with, in degrees. */
-	public int overlayFov = 110;
+	public int overlayFov = 100;
 
 	public static ClientConfig load() {
 		ClientConfig c = new ClientConfig();

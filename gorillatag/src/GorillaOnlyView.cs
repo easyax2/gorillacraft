@@ -14,7 +14,7 @@ namespace GorillaCraft
         /// <summary>Unnamed in Gorilla Tag, so nothing of its own is on it.</summary>
         public const int Layer = 3;
 
-        private readonly Dictionary<Camera, (int mask, CameraClearFlags clear, Color color)> saved = new Dictionary<Camera, (int, CameraClearFlags, Color)>();
+        private readonly Dictionary<Camera, (int mask, CameraClearFlags clear, Color color, float far)> saved = new Dictionary<Camera, (int, CameraClearFlags, Color, float)>();
         private int rigMask;
         private int loggedMask;
         private float nextRefresh;
@@ -36,6 +36,7 @@ namespace GorillaCraft
                 kv.Key.cullingMask = kv.Value.mask;
                 kv.Key.clearFlags = kv.Value.clear;
                 kv.Key.backgroundColor = kv.Value.color;
+                kv.Key.farClipPlane = kv.Value.far;
             }
             saved.Clear();
         }
@@ -68,12 +69,15 @@ namespace GorillaCraft
                 if (cam.targetTexture != null && !cam.stereoEnabled && cam != Camera.main)
                     continue; // mirrors, monitors and the like: leave them
                 if (!saved.ContainsKey(cam))
-                    saved[cam] = (cam.cullingMask, cam.clearFlags, cam.backgroundColor);
+                    saved[cam] = (cam.cullingMask, cam.clearFlags, cam.backgroundColor, cam.farClipPlane);
                 int mask = saved[cam].mask & rigMask | 1 << Layer;
                 if (cam.cullingMask != mask)
                     cam.cullingMask = mask;
                 cam.clearFlags = CameraClearFlags.SolidColor;
                 cam.backgroundColor = Color.black;
+                // Minecraft's sky sits 300 blocks out; Gorilla Tag's far plane would clip it into a black disc.
+                if (cam.farClipPlane < 2000f)
+                    cam.farClipPlane = 2000f;
             }
         }
 

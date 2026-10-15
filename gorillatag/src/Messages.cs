@@ -82,11 +82,25 @@ namespace GorillaCraft
             /// <summary>Camera position the frame was drawn from (Minecraft coordinates).</summary>
             public double CamX, CamY, CamZ;
             public int Width, Height;
-            /// <summary>RGB, rows top to bottom.</summary>
-            public byte[] Rgb;
+            /// <summary>RGBA, rows top to bottom.</summary>
+            public byte[] Rgba;
             public int GridW, GridH;
             /// <summary>xyz per grid point, relative to the camera (Minecraft axes), rows top to bottom.</summary>
             public float[] Points;
+        }
+
+        /// <summary>Minecraft's whole window while a screen (inventory, chest...) is open; no size = closed.</summary>
+        public sealed class GuiFrame
+        {
+            public int Width, Height;
+            public byte[] Rgba;
+        }
+
+        /// <summary>The held item's texture (PNG). Kind 0 nothing, 1 item, 2 block.</summary>
+        public sealed class Held
+        {
+            public int Kind;
+            public byte[] Png;
         }
 
         public static readonly Box FullCube = new Box { MaxX = 1, MaxY = 1, MaxZ = 1 };
@@ -131,9 +145,18 @@ namespace GorillaCraft
                     return h;
                 case Proto.McStatus:
                     return new Status { Text = r.Str() };
+                case Proto.McGuiFrame:
+                    var g = new GuiFrame { Width = r.I32(), Height = r.I32() };
+                    g.Rgba = g.Width > 0 ? r.Bytes(g.Width * g.Height * 4) : null;
+                    return g;
+                case Proto.McHeld:
+                    var held = new Held { Kind = r.U8() };
+                    int len = r.I32();
+                    held.Png = len > 0 ? r.Bytes(len) : null;
+                    return held;
                 case Proto.McFrame:
                     var f = new Frame { Id = r.I32(), Eye = r.U8(), CamX = r.F64(), CamY = r.F64(), CamZ = r.F64(), Width = r.I32(), Height = r.I32() };
-                    f.Rgb = r.Bytes(f.Width * f.Height * 3);
+                    f.Rgba = r.Bytes(f.Width * f.Height * 4);
                     f.GridW = r.I32();
                     f.GridH = r.I32();
                     f.Points = r.Floats(f.GridW * f.GridH * 3);

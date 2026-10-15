@@ -38,6 +38,8 @@ namespace GorillaCraft
         private readonly Surface[] surfaces = new Surface[3]; // left, right, centre
         private readonly EyePass pass;
         public bool Visible { get; set; }
+        /// <summary>Show the left picture to the right eye and vice versa (if the views look inside out).</summary>
+        public bool SwapEyes;
 
         /// <summary>Whether the last frame was drawn per eye (the render pass saw separate eye passes).</summary>
         public bool PerEyeSeen => pass.SawMultiPass;
@@ -75,12 +77,12 @@ namespace GorillaCraft
             {
                 if (s.Texture != null)
                     Object.Destroy(s.Texture);
-                s.Texture = new Texture2D(f.Width, f.Height, TextureFormat.RGB24, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+                s.Texture = new Texture2D(f.Width, f.Height, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
                 s.Material.mainTexture = s.Texture;
                 if (s.Material.HasProperty("_BaseMap"))
                     s.Material.SetTexture("_BaseMap", s.Texture);
             }
-            s.Texture.LoadRawTextureData(f.Rgb);
+            s.Texture.LoadRawTextureData(f.Rgba);
             s.Texture.Apply(false);
 
             int n = f.GridW * f.GridH;
@@ -157,6 +159,8 @@ namespace GorillaCraft
                 if (cameraData.xr != null && cameraData.xr.enabled && !cameraData.xr.singlePassEnabled)
                 {
                     eye = cameraData.xr.multipassId;
+                    if (view.SwapEyes)
+                        eye = 1 - eye;
                     SawMultiPass = true;
                 }
                 Surface s = view.For(eye);

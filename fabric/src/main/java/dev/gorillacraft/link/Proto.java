@@ -6,7 +6,7 @@ package dev.gorillacraft.link;
  * length counts the type byte and the payload.
  */
 public final class Proto {
-	public static final int VERSION = 4;
+	public static final int VERSION = 5;
 	public static final int MAX_FRAME = 64 << 20;
 
 	// Gorilla Tag → Minecraft
@@ -19,6 +19,9 @@ public final class Proto {
 	public static final int GT_OPEN_WORLD = 0x07;
 	public static final int GT_JOIN_SERVER = 0x08;
 	public static final int GT_LEAVE_WORLD = 0x09;
+	public static final int GT_INVENTORY = 0x0A;
+	public static final int GT_POINTER = 0x0B;
+	public static final int GT_SCROLL = 0x0C;
 
 	// Minecraft → Gorilla Tag
 	public static final int MC_WELCOME = 0x81;
@@ -31,6 +34,8 @@ public final class Proto {
 	public static final int MC_STATUS = 0x88;
 	public static final int MC_WORLDS = 0x89;
 	public static final int MC_FRAME = 0x8A;
+	public static final int MC_GUI_FRAME = 0x8B;
+	public static final int MC_HELD = 0x8C;
 
 	/** GT_HELLO flags: what Gorilla Tag wants. */
 	public static final int WANT_BLOCK_MESHES = 1;

@@ -20,7 +20,7 @@ namespace GorillaCraft
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.5.0";
+        public const string Version = "0.6.0";
 
         internal static ManualLogSource Log;
 
@@ -54,6 +54,11 @@ namespace GorillaCraft
         private HandInteraction hands;
         private OverlayView overlay;
         private readonly GorillaOnlyView gorillaOnly = new GorillaOnlyView();
+        private InventoryPanel inventory;
+        private HeldItemView held;
+        private ConfigEntry<bool> swapEyes;
+        private float yDownAt = -1f;
+        private bool yDown;
         private readonly Messages.Frame[] latestFrames = new Messages.Frame[3]; // newest per eye
         private WristDisplay wrist;
 
@@ -84,7 +89,7 @@ namespace GorillaCraft
                 "Where the Minecraft world's spawn point is placed in Gorilla Tag's world, far away from Gorilla Tag's own maps.");
             blockScale = Config.Bind("Map", "BlockScale", 1f, "Size of one Minecraft block in Gorilla Tag units (meters).");
             touchDistance = Config.Bind("Hands", "TouchDistance", 0.12f, "How close (in Gorilla Tag units) a hand must be to a block to punch or use it.");
-            punchSpeed = Config.Bind("Hands", "PunchSpeed", 2.0f, "How fast (meters per second) a hand must hit a block to count as a punch. Lower: lighter taps break blocks; higher: climbing never does.");
+            punchSpeed = Config.Bind("Hands", "PunchSpeed", 3.0f, "How fast (metres per second, straight into the block) a hand must hit it to count as a punch. Higher: you have to hit harder, and climbing never breaks blocks.");
             punchHold = Config.Bind("Hands", "PunchHold", 0.4f, "Seconds Minecraft keeps mining after each punch. Survival blocks that take longer need more punches.");
             fistMode = Config.Bind("Hands", "FistMode", false, "Only punches with a fist (grip held) break blocks, so climbing never does. The trigger then uses/places instead of the grip.");
             autoEnter = Config.Bind("Map", "AutoEnter", true, "Enter the Minecraft map as soon as Minecraft is ready (alone, in a private room or in a modded lobby). Hold B+Y for a second to enter or leave by hand.");
@@ -97,6 +102,7 @@ namespace GorillaCraft
             perEye = Config.Bind("Rendering", "PerEye", true,
                 "Overlay: Minecraft draws each eye's view separately (left and right take turns), and Gorilla Tag renders the eyes " +
                 "one after the other so each sees its own picture. Off: one picture from the middle of your head for both eyes (lighter). Restart after changing.");
+            swapEyes = Config.Bind("Rendering", "SwapEyes", false, "Show each eye the other eye's Minecraft picture. Only if the 3D looks inside out.");
             if (OverlayMode && perEye.Value)
                 ForceMultiPass();
             autoInstall = Config.Bind("Minecraft", "AutoInstall", true, "Create/update the GorillaCraft instance in Prism Launcher (Minecraft 26.3, Fabric, Fabric API, this mod) when Gorilla Tag starts.");
@@ -125,6 +131,7 @@ namespace GorillaCraft
                 new MainMenu.Setting { Name = "Fist mode (punch with grip, use with trigger)", Value = () => OnOff(fistMode.Value), Change = d => fistMode.Value = !fistMode.Value },
                 new MainMenu.Setting { Name = "Punch speed", Value = () => punchSpeed.Value.ToString("0.0") + " m/s", Change = d => punchSpeed.Value = Mathf.Clamp(punchSpeed.Value + 0.2f * d, 0.2f, 6f) },
                 new MainMenu.Setting { Name = "Mining per punch", Value = () => punchHold.Value.ToString("0.00") + " s", Change = d => punchHold.Value = Mathf.Clamp(punchHold.Value + 0.05f * d, 0.05f, 2f) },
+                new MainMenu.Setting { Name = "Swap eyes (if 3D looks inside out)", Value = () => OnOff(swapEyes.Value), Change = d => swapEyes.Value = !swapEyes.Value },
                 new MainMenu.Setting { Name = "Hand reach", Value = () => touchDistance.Value.ToString("0.00") + " m", Change = d => touchDistance.Value = Mathf.Clamp(touchDistance.Value + 0.02f * d, 0.02f, 0.5f) },
                 new MainMenu.Setting { Name = "Block size (after restart)", Value = () => blockScale.Value.ToString("0.0#") + " m", Change = d => blockScale.Value = Mathf.Clamp(blockScale.Value + 0.1f * d, 0.2f, 3f) },
                 new MainMenu.Setting { Name = "Start Minecraft with Gorilla Tag", Value = () => OnOff(autoLaunch.Value), Change = d => autoLaunch.Value = !autoLaunch.Value },
@@ -288,6 +295,8 @@ namespace GorillaCraft
             hands = new HandInteraction(world, link, touchDistance.Value, punchSpeed.Value, punchHold.Value, fistMode.Value, highlightShader);
             if (OverlayMode)
                 overlay = new OverlayView(highlightShader);
+            inventory = new InventoryPanel(link, highlightShader);
+            held = new HeldItemView(highlightShader);
             wrist = new WristDisplay(player.GetControllerTransform(true));
             wrist.SetConnected(link.Connected);
             Log.LogInfo($"Ready (block colliders on layer {layer})");
@@ -350,12 +359,22 @@ namespace GorillaCraft
             hands.punchSpeed = punchSpeed.Value;
             hands.punchHold = punchHold.Value;
             hands.fistMode = fistMode.Value;
+            if (overlay != null)
+                overlay.SwapEyes = swapEyes.Value;
             if (inMap)
             {
                 UpdateHold();
-                if (!holding)
+                UpdateInventoryButton();
+                if (inventory.Open)
+                {
+                    hands.Stop(); // pointing at the panel, not punching
+                    inventory.Update();
+                }
+                else if (!holding)
                     hands.Update();
             }
+            held.Visible = inMap && !inventory.Open;
+            held.Update();
             SendPose();
         }
 
@@ -406,6 +425,13 @@ namespace GorillaCraft
                     hands.SelectedSlot = h.Selected;
                     wrist.SetHotbar(h);
                     break;
+                case Messages.GuiFrame gf:
+                    if (inMap || gf.Width == 0)
+                        inventory.Show(gf);
+                    break;
+                case Messages.Held h:
+                    held.Set(h);
+                    break;
                 case Messages.Worlds ws:
                     menu.SetWorlds(ws);
                     break;
@@ -445,6 +471,20 @@ namespace GorillaCraft
         {
             int dx = s.Item1 - cx, dy = s.Item2 - cy, dz = s.Item3 - cz;
             return dx * dx + dy * dy + dz * dz;
+        }
+
+        /// <summary>A quick tap on Y (without B) opens or closes Minecraft's inventory.</summary>
+        private void UpdateInventoryButton()
+        {
+            bool y = ControllerInputPoller.SecondaryButtonPress(XRNode.LeftHand);
+            bool b = ControllerInputPoller.SecondaryButtonPress(XRNode.RightHand);
+            if (y && !yDown)
+                yDownAt = b ? -1f : Time.time;
+            if (b)
+                yDownAt = -1f; // B+Y is the map toggle, not the inventory
+            if (!y && yDown && yDownAt >= 0f && Time.time - yDownAt < 0.4f)
+                inventory.Toggle();
+            yDown = y;
         }
 
         /// <summary>Hold B and Y together for a second to enter or leave the Minecraft map.</summary>
@@ -497,6 +537,7 @@ namespace GorillaCraft
             inMap = false;
             holding = false;
             hands.Stop();
+            inventory.Close();
             world.Visible = false;
             if (overlay != null)
                 overlay.Visible = false;
