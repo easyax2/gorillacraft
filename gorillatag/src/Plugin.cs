@@ -20,7 +20,7 @@ namespace GorillaCraft
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.7.1";
+        public const string Version = "0.7.2";
 
         internal static ManualLogSource Log;
 
@@ -104,7 +104,7 @@ namespace GorillaCraft
             perEye = Config.Bind("Rendering", "PerEye", true,
                 "Overlay: Minecraft draws each eye's view separately (left and right take turns), and Gorilla Tag renders the eyes " +
                 "one after the other so each sees its own picture. Off: one picture from the middle of your head for both eyes (lighter). Restart after changing.");
-            cutEdges = Config.Bind("Rendering", "CutEdges", true, "Overlay: cut the picture at depth edges and fill the gap from the other eye, instead of stretching it (which smears when you move).");
+            cutEdges = Config.Bind("Rendering", "CutEdges", true, "Overlay: at depth edges, put the picture on the background behind the edge instead of stretching it across (which smears when you move).");
             swapEyes = Config.Bind("Rendering", "SwapEyes", false, "Show each eye the other eye's Minecraft picture. Only if the 3D looks inside out.");
             if (OverlayMode && perEye.Value)
                 ForceMultiPass();
@@ -134,7 +134,7 @@ namespace GorillaCraft
                 new MainMenu.Setting { Name = "Fist mode (punch with grip, use with trigger)", Value = () => OnOff(fistMode.Value), Change = d => fistMode.Value = !fistMode.Value },
                 new MainMenu.Setting { Name = "Punch speed", Value = () => punchSpeed.Value.ToString("0.0") + " m/s", Change = d => punchSpeed.Value = Mathf.Clamp(punchSpeed.Value + 0.2f * d, 0.2f, 6f) },
                 new MainMenu.Setting { Name = "Mining per punch", Value = () => punchHold.Value.ToString("0.00") + " s", Change = d => punchHold.Value = Mathf.Clamp(punchHold.Value + 0.05f * d, 0.05f, 2f) },
-                new MainMenu.Setting { Name = "Cut picture at edges (less smearing)", Value = () => OnOff(cutEdges.Value), Change = d => cutEdges.Value = !cutEdges.Value },
+                new MainMenu.Setting { Name = "Clean edges (less smearing)", Value = () => OnOff(cutEdges.Value), Change = d => cutEdges.Value = !cutEdges.Value },
                 new MainMenu.Setting { Name = "Swap eyes (if 3D looks inside out)", Value = () => OnOff(swapEyes.Value), Change = d => swapEyes.Value = !swapEyes.Value },
                 new MainMenu.Setting { Name = "Hand reach", Value = () => touchDistance.Value.ToString("0.00") + " m", Change = d => touchDistance.Value = Mathf.Clamp(touchDistance.Value + 0.02f * d, 0.02f, 0.5f) },
                 new MainMenu.Setting { Name = "Block size (after restart)", Value = () => blockScale.Value.ToString("0.0#") + " m", Change = d => blockScale.Value = Mathf.Clamp(blockScale.Value + 0.1f * d, 0.2f, 3f) },

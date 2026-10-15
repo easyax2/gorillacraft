@@ -19,10 +19,13 @@ namespace GorillaCraft
     /// used for both.
     ///
     /// Cells that span a real depth edge (a block in front of something far away, or against the
-    /// sky) are cut, instead of being stretched into a "curtain" that smears as soon as the eye
-    /// moves. Flat surfaces seen at a low angle and block corners have no real jump and stay. The
-    /// gaps left at edges are filled with the other eye's picture, drawn just behind: it saw a
-    /// little further round the edge.
+    /// sky) would otherwise be stretched into a slanted "curtain" that smears as soon as the eye
+    /// moves. Instead such a cell gets its own corners, each slid back along its own camera ray
+    /// to the far side's depth: from where Minecraft drew the picture it still looks exactly the
+    /// same (a point moved along its ray lands on the same pixel), but from your eye it behaves
+    /// like the background behind the edge. No holes, no curtains; only the outermost pixels of a
+    /// silhouette ride on the background. Flat surfaces seen at a low angle and block corners have
+    /// no real jump and are left alone.
     /// </summary>
     public sealed class OverlayView
     {
@@ -32,6 +35,7 @@ namespace GorillaCraft
             public Material Material;
             public Texture2D Texture;
             public Vector3[] Vertices = new Vector3[0];
+            public Vector2[] Uvs = new Vector2[0];
             public readonly List<int> Triangles = new List<int>();
             public int GridW, GridH;
             public Matrix4x4 LocalToWorld = Matrix4x4.identity;
@@ -118,8 +122,11 @@ namespace GorillaCraft
                 int n = f.GridW * f.GridH;
                 s.GridW = f.GridW;
                 s.GridH = f.GridH;
-                s.Vertices = new Vector3[n];
-                var uvs = new Vector2[n];
+                // The grid's points, then room for 4 extra corners per cell (edge cells).
+                int cells = (f.GridW - 1) * (f.GridH - 1);
+                s.Vertices = new Vector3[n + cells * 4];
+                s.Uvs = new Vector2[n + cells * 4];
+                var uvs = s.Uvs;
                 // Grid rows go top to bottom. Unity puts the first pixel row at v = 0: that's the
                 // top for socket frames, the bottom for shared-memory ones.
                 for (int y = 0; y < s.GridH; y++)
@@ -128,25 +135,12 @@ namespace GorillaCraft
                         float v = y / (s.GridH - 1f);
                         uvs[y * s.GridW + x] = new Vector2(x / (s.GridW - 1f), bottomUp ? 1f - v : v);
                     }
-                s.Triangles.Clear();
-                for (int y = 0; y < s.GridH - 1; y++)
-                {
-                    for (int x = 0; x < s.GridW - 1; x++)
-                    {
-                        int a = y * s.GridW + x, b = a + 1, c = a + s.GridW, d = c + 1;
-                        s.Triangles.Add(a); s.Triangles.Add(b); s.Triangles.Add(c);
-                        s.Triangles.Add(b); s.Triangles.Add(d); s.Triangles.Add(c);
-                    }
-                }
                 s.Mesh.Clear();
-                s.Mesh.vertices = s.Vertices;
-                s.Mesh.uv = uvs;
-                s.Mesh.SetTriangles(s.Triangles, 0, false);
             }
             return s;
         }
 
-        /// <summary>Cut cells at depth edges (see the class comment). Off: draw every cell.</summary>
+        /// <summary>Push edge cells back to the far depth (see the class comment). Off: plain stretched grid.</summary>
         public static bool CutEdges = true;
 
         private static void Finish(Surface s, float[] points, double camX, double camY, double camZ, Coords coords)
@@ -155,23 +149,42 @@ namespace GorillaCraft
             int n = s.GridW * s.GridH;
             for (int i = 0; i < n; i++)
                 s.Vertices[i] = new Vector3(points[i * 3], points[i * 3 + 1], -points[i * 3 + 2]); // flip Z
-            s.Mesh.vertices = s.Vertices;
             s.Triangles.Clear();
+            int count = n;
             for (int y = 0; y < s.GridH - 1; y++)
             {
                 for (int x = 0; x < s.GridW - 1; x++)
                 {
                     int a = y * s.GridW + x, b = a + 1, c = a + s.GridW, d = c + 1;
                     if (CutEdges && !Continuous(s.Vertices, a, b, c, d))
-                        continue;
+                    {
+                        // Its own corners, each slid back along its ray to the cell's farthest depth.
+                        float far = Mathf.Max(Mathf.Max(s.Vertices[a].magnitude, s.Vertices[b].magnitude),
+                            Mathf.Max(s.Vertices[c].magnitude, s.Vertices[d].magnitude));
+                        int e = count;
+                        PushBack(s, a, count++, far);
+                        PushBack(s, b, count++, far);
+                        PushBack(s, c, count++, far);
+                        PushBack(s, d, count++, far);
+                        a = e; b = e + 1; c = e + 2; d = e + 3;
+                    }
                     s.Triangles.Add(a); s.Triangles.Add(b); s.Triangles.Add(c);
                     s.Triangles.Add(b); s.Triangles.Add(d); s.Triangles.Add(c);
                 }
             }
+            s.Mesh.Clear();
+            s.Mesh.SetVertices(s.Vertices, 0, count);
+            s.Mesh.SetUVs(0, s.Uvs, 0, count);
             s.Mesh.SetTriangles(s.Triangles, 0, false);
             s.Mesh.RecalculateBounds();
             s.LocalToWorld = Matrix4x4.TRS(coords.ToUnity(camX, camY, camZ), Quaternion.identity, Vector3.one * coords.Scale);
             s.HasFrame = true;
+        }
+
+        private static void PushBack(Surface s, int from, int to, float distance)
+        {
+            s.Vertices[to] = s.Vertices[from].normalized * distance;
+            s.Uvs[to] = s.Uvs[from];
         }
 
         private const float Sky = 290f; // Minecraft puts sky points 300 blocks out
@@ -222,9 +235,6 @@ namespace GorillaCraft
                 public Mesh Mesh;
                 public Material Material;
                 public Matrix4x4 Matrix;
-                public Mesh FillMesh;
-                public Material FillMaterial;
-                public Matrix4x4 FillMatrix;
             }
 
             public EyePass(OverlayView view)
@@ -247,31 +257,15 @@ namespace GorillaCraft
                 Surface s = view.For(eye);
                 if (s == null)
                     return;
-                // The other eye's picture fills the gaps at edges, pushed 1% further from its camera
-                // so this eye's own picture wins wherever both have something.
-                Surface fill = eye == 0 || eye == 1 ? view.surfaces[1 - eye] : null;
-                if (fill != null && (!fill.HasFrame || fill == s || !CutEdges))
-                    fill = null;
                 using (var builder = renderGraph.AddRasterRenderPass<PassData>("GorillaCraft Minecraft view", out var data))
                 {
                     data.Mesh = s.Mesh;
                     data.Material = s.Material;
                     data.Matrix = s.LocalToWorld;
-                    if (fill != null)
-                    {
-                        data.FillMesh = fill.Mesh;
-                        data.FillMaterial = fill.Material;
-                        data.FillMatrix = fill.LocalToWorld * Matrix4x4.Scale(Vector3.one * 1.01f);
-                    }
                     builder.SetRenderAttachment(resources.activeColorTexture, 0, AccessFlags.Write);
                     builder.SetRenderAttachmentDepth(resources.activeDepthTexture, AccessFlags.ReadWrite);
                     builder.AllowPassCulling(false);
-                    builder.SetRenderFunc((PassData d, RasterGraphContext ctx) =>
-                    {
-                        if (d.FillMesh != null)
-                            ctx.cmd.DrawMesh(d.FillMesh, d.FillMatrix, d.FillMaterial, 0, 0);
-                        ctx.cmd.DrawMesh(d.Mesh, d.Matrix, d.Material, 0, 0);
-                    });
+                    builder.SetRenderFunc((PassData d, RasterGraphContext ctx) => ctx.cmd.DrawMesh(d.Mesh, d.Matrix, d.Material, 0, 0));
                 }
             }
         }
