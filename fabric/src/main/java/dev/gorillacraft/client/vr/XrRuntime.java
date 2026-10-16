@@ -228,7 +228,7 @@ public final class XrRuntime {
 		}
 		// The system's loader knows where the system's runtime is registered; ours is the fallback.
 		String sys = null;
-		if (Platform.get() == Platform.LINUX) {
+		if (Platform.get() == Platform.LINUX && System.getenv("GORILLACRAFT_BUNDLED_OPENXR") == null) {
 			for (String p : List.of("/usr/lib/libopenxr_loader.so.1", "/usr/lib64/libopenxr_loader.so.1",
 					"/usr/lib/x86_64-linux-gnu/libopenxr_loader.so.1")) {
 				if (Files.exists(Path.of(p))) {

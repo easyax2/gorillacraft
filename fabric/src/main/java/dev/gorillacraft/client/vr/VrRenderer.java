@@ -90,6 +90,16 @@ public final class VrRenderer {
 	}
 
 	private int eyeIndex;
+	private Vec3 extractionPos = Vec3.ZERO;
+
+	/**
+	 * During an eye pass: where the world was extracted from (the middle of the head). Minecraft's
+	 * section grid, compiling and visibility use this for both eyes, so the grid can't move
+	 * between the eyes (they're 6 cm apart and can sit on two sides of a section boundary).
+	 */
+	public Vec3 extractionPos() {
+		return extractionPos;
+	}
 
 	/** True while the right eye is drawn (after the left, which did the shared work). */
 	public boolean secondEye() {
@@ -292,6 +302,7 @@ public final class VrRenderer {
 		int winW = state.windowRenderState.width, winH = state.windowRenderState.height;
 		CameraRenderState cam = state.levelRenderState.cameraRenderState;
 		Vec3 headPos = cam.pos;
+		extractionPos = headPos;
 		Quaternionf headRot = new Quaternionf(cam.orientation);
 		Matrix4f headView = new Matrix4f(cam.viewRotationMatrix);
 		Matrix4f headProj = new Matrix4f(cam.projectionMatrix);
