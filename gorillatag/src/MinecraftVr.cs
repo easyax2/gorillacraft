@@ -24,7 +24,33 @@ namespace GorillaCraft
         /// <summary>Whether Minecraft started this Gorilla Tag.</summary>
         public static bool StartedByMinecraft()
         {
-            return System.Environment.GetCommandLineArgs().Any(a => a.Equals("-gorillacraft", System.StringComparison.OrdinalIgnoreCase));
+            return System.Environment.GetCommandLineArgs().Any(a => a.Equals("-gorillacraft", System.StringComparison.OrdinalIgnoreCase))
+                || System.Environment.GetEnvironmentVariable("GORILLACRAFT") == "1";
+        }
+
+        /// <summary>
+        /// Started outside Steam (Minecraft starts Gorilla Tag.exe itself on Windows), Steamworks
+        /// would quit and relaunch the game through Steam, and SteamVR then takes the headset away
+        /// from Minecraft. Called first thing, before Gorilla Tag's SteamManager wakes up.
+        /// </summary>
+        public static void StayOutOfSteamLaunch(Harmony harmony)
+        {
+            try
+            {
+                var m = AccessTools.Method("Steamworks.SteamAPI:RestartAppIfNecessary");
+                if (m != null)
+                    harmony.Patch(m, prefix: new HarmonyMethod(typeof(MinecraftVr), nameof(NoRestart)));
+            }
+            catch (System.Exception e)
+            {
+                Plugin.Log.LogWarning("Couldn't stop Steam relaunching Gorilla Tag: " + e.Message);
+            }
+        }
+
+        private static bool NoRestart(ref bool __result)
+        {
+            __result = false;
+            return false;
         }
 
         public static void Enable(Harmony harmony)

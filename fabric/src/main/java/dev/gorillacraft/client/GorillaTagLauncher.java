@@ -92,14 +92,24 @@ final class GorillaTagLauncher {
 				return false;
 			}
 			Path appId = exe.resolveSibling("steam_appid.txt");
-			if (!Files.exists(appId)) {
-				Files.writeString(appId, APP_ID);
+			try {
+				if (!Files.exists(appId)) {
+					Files.writeString(appId, APP_ID);
+				}
+			} catch (Exception e) {
+				GorillaCraft.LOG.info("Couldn't write {} ({}); the environment variables do the same", appId, e.toString());
 			}
 			List<String> cmd = new ArrayList<>();
 			cmd.add(exe.toString());
 			cmd.addAll(List.of(GAME_ARGS));
-			new ProcessBuilder(cmd).directory(exe.getParent().toFile()).redirectOutput(ProcessBuilder.Redirect.DISCARD)
-					.redirectError(ProcessBuilder.Redirect.DISCARD).start();
+			ProcessBuilder pb = new ProcessBuilder(cmd).directory(exe.getParent().toFile()).redirectOutput(ProcessBuilder.Redirect.DISCARD)
+					.redirectError(ProcessBuilder.Redirect.DISCARD);
+			// What Steam itself sets for a game it starts: Steamworks then runs without relaunching
+			// through Steam. GORILLACRAFT tells the plugin Minecraft started it (if the arguments get lost).
+			pb.environment().put("SteamAppId", APP_ID);
+			pb.environment().put("SteamGameId", APP_ID);
+			pb.environment().put("GORILLACRAFT", "1");
+			pb.start();
 			GorillaCraft.LOG.info("Starting Gorilla Tag: {}", String.join(" ", cmd));
 			return true;
 		} catch (Exception e) {
@@ -110,6 +120,17 @@ final class GorillaTagLauncher {
 
 	/** Gorilla Tag.exe in whichever Steam library has it (libraryfolders.vdf lists them). */
 	private static Path findGameExe() {
+		// Windows' own record of the install (Steam writes it).
+		for (String key : List.of("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Steam App " + APP_ID,
+				"HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Steam App " + APP_ID)) {
+			String dir = regValue(key, "InstallLocation");
+			if (dir != null) {
+				Path exe = Path.of(dir).resolve("Gorilla Tag.exe");
+				if (Files.exists(exe)) {
+					return exe;
+				}
+			}
+		}
 		String steamExe = windowsSteam();
 		List<Path> libraries = new ArrayList<>();
 		if (steamExe != null) {
@@ -133,16 +154,23 @@ final class GorillaTagLauncher {
 		return null;
 	}
 
-	private static String windowsSteam() {
-		List<String> tries = new ArrayList<>();
+	/** A registry string value, or null. */
+	private static String regValue(String key, String name) {
 		try {
-			Process p = new ProcessBuilder("reg", "query", "HKCU\\Software\\Valve\\Steam", "/v", "SteamExe").start();
+			Process p = new ProcessBuilder("reg", "query", key, "/v", name).start();
 			String out = new String(p.getInputStream().readAllBytes());
 			int i = out.indexOf("REG_SZ");
-			if (i >= 0) {
-				tries.add(out.substring(i + 6).trim().replace('/', File.separatorChar));
-			}
-		} catch (Exception ignored) {
+			return i >= 0 ? out.substring(i + 6).trim() : null;
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	private static String windowsSteam() {
+		List<String> tries = new ArrayList<>();
+		String exe = regValue("HKCU\\Software\\Valve\\Steam", "SteamExe");
+		if (exe != null) {
+			tries.add(exe.replace('/', File.separatorChar));
 		}
 		tries.add("C:\\Program Files (x86)\\Steam\\steam.exe");
 		tries.add("C:\\Program Files\\Steam\\steam.exe");

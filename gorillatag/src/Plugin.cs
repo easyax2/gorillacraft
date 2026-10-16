@@ -24,7 +24,7 @@ namespace GorillaCraft
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.10.9";
+        public const string Version = "0.10.10";
 
         internal static ManualLogSource Log;
         private static Plugin instance;
@@ -90,7 +90,9 @@ namespace GorillaCraft
                 Log.LogInfo("Gorilla Tag started normally: GorillaCraft stays out of the way. To play, start the GorillaCraft instance in Prism; it starts Gorilla Tag itself.");
                 return;
             }
-            MinecraftVr.Enable(new Harmony(Guid));
+            var vrHarmony = new Harmony(Guid);
+            MinecraftVr.StayOutOfSteamLaunch(vrHarmony);
+            MinecraftVr.Enable(vrHarmony);
             // Colliders only: nothing here is drawn.
             link = new LinkClient(host.Value, port.Value, s => Log.LogInfo(s), () => (byte)0);
             link.Start();
