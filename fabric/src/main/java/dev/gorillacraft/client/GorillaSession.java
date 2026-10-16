@@ -64,6 +64,9 @@ public final class GorillaSession {
 	private double poseX, poseY, poseZ;
 	/** Eye positions (Minecraft coordinates), for per-eye frames. */
 	private final double[][] eyes = new double[2][3];
+	/** Hand positions (Minecraft coordinates) and the gorilla's colour, for the avatar others see. */
+	private Vec3 leftHand = Vec3.ZERO, rightHand = Vec3.ZERO;
+	private int gorillaColor = 0x202020;
 	/** Which eye the next overlay frame is drawn for. */
 	private int nextEye = Proto.EYE_LEFT;
 	private float poseYaw, posePitch;
@@ -159,6 +162,7 @@ public final class GorillaSession {
 		}
 
 		updatePresence(mc);
+		sendAvatarPose(mc);
 		updateOverlay(mc);
 		tickScreens(mc, player);
 		tickMining(mc, player);
@@ -214,6 +218,9 @@ public final class GorillaSession {
 					eye[1] = m.f64();
 					eye[2] = m.f64();
 				}
+				leftHand = new Vec3(m.f64(), m.f64(), m.f64());
+				rightHand = new Vec3(m.f64(), m.f64(), m.f64());
+				gorillaColor = m.i32();
 				havePose = true;
 				if (nowInMap && !inMap) {
 					inMap = true;
@@ -268,6 +275,15 @@ public final class GorillaSession {
 			}
 			default -> GorillaCraft.LOG.warn("Unknown message 0x{} from Gorilla Tag", Integer.toHexString(m.type));
 		}
+	}
+
+	/** Tells the server where this gorilla's head and hands are, so everyone sees it (GorillaAvatars). */
+	private void sendAvatarPose(Minecraft mc) {
+		if (!driving() || !havePose || poseAck < teleportId || mc.getConnection() == null
+				|| !ClientPlayNetworking.canSend(dev.gorillacraft.GorillaPosePayload.TYPE)) {
+			return;
+		}
+		ClientPlayNetworking.send(new dev.gorillacraft.GorillaPosePayload(new Vec3(poseX, poseY, poseZ), poseYaw, posePitch, leftHand, rightHand, gorillaColor));
 	}
 
 	/** The shared frame memory, once Gorilla Tag has confirmed it can read it; else null (use the socket). */

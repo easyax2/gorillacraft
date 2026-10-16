@@ -41,6 +41,13 @@ Tag features aren't in yet. This is interactions and maps only.
   on a panel you point at and click with your right hand.
 - **Live changes:** anything that changes in Minecraft (you, other players, redstone, water,
   explosions) updates in Gorilla Tag.
+- **Gorillas in Minecraft:** every GorillaCraft player is a gorilla in the Minecraft world, posed
+  from their real head and hands, in their Gorilla Tag colour, holding their held item. It's made
+  of Minecraft display entities, so **everyone** on the server sees it, even players without the
+  mod; the player's normal model is hidden. In VR you see other gorillas in Minecraft's picture,
+  while your own hands stay Gorilla Tag's (no delay).
+
+  ![A gorilla in Minecraft](docs/gorilla-avatar.png)
 - **Multiplayer:** run a Fabric 26.3 server with GorillaCraft and Fabric API, and everyone joins
   it from the menu. Gorillas on the same server share the world, and they line up in Gorilla Tag
   too, because the map is anchored at the Minecraft world's spawn point.
@@ -106,8 +113,8 @@ sections, `sectionsPerTick`, and for the overlay `overlayWidth`, `overlayGrid`, 
   other frame: raise Minecraft's Max Framerate to 60+ if you can). The 3D surface keeps head
   turning smooth in between. Fast movement shows edges where Minecraft hasn't drawn
   yet, and things right next to edges can look smeared until the next frame.
-- Mobs and items are in the picture but flattened onto the wall behind them (depth comes from
-  blocks only).
+- Mobs, players and gorillas get depth from their hitboxes, so they stand in front of the wall
+  behind them, but as boxes: an outstretched arm is drawn at the body's depth.
 - The overlay needs Minecraft's window open (not minimised), and its window size is the overlay's
   resolution.
 - If you die in Minecraft (survival), you respawn straight away.

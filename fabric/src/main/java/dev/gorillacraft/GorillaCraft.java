@@ -1,6 +1,7 @@
 package dev.gorillacraft;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -19,9 +20,24 @@ public class GorillaCraft implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		PayloadTypeRegistry.serverboundPlay().register(GorillaPresencePayload.TYPE, GorillaPresencePayload.CODEC);
-		ServerPlayNetworking.registerGlobalReceiver(GorillaPresencePayload.TYPE,
-				(payload, context) -> GorillaPlayers.set(context.player().getUUID(), payload.active()));
-		ServerPlayConnectionEvents.DISCONNECT.register(
-				(handler, server) -> GorillaPlayers.set(handler.player.getUUID(), false));
+		PayloadTypeRegistry.serverboundPlay().register(GorillaPosePayload.TYPE, GorillaPosePayload.CODEC);
+		ServerPlayNetworking.registerGlobalReceiver(GorillaPresencePayload.TYPE, (payload, context) -> {
+			GorillaPlayers.set(context.player().getUUID(), payload.active());
+			if (!payload.active()) {
+				GorillaAvatars.remove(context.player().getUUID());
+				context.player().setInvisible(false);
+			}
+		});
+		ServerPlayNetworking.registerGlobalReceiver(GorillaPosePayload.TYPE, (payload, context) -> GorillaAvatars.update(context.player(), payload));
+		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+			GorillaPlayers.set(handler.player.getUUID(), false);
+			GorillaAvatars.remove(handler.player.getUUID());
+		});
+		// Avatar parts are never kept: discard any that come back from disk.
+		ServerEntityEvents.ENTITY_LOAD.register((entity, level) -> {
+			if (GorillaAvatars.isLeftover(entity)) {
+				entity.discard();
+			}
+		});
 	}
 }

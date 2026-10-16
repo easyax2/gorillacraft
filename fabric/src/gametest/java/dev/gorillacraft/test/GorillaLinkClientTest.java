@@ -84,6 +84,20 @@ public class GorillaLinkClientTest implements FabricClientGameTest {
 			context.waitFor(mc -> Files.exists(dir.resolve("done-server")), 20 * 180);
 			BlockState mined = server.computeOnServer(s -> s.overworld().getBlockState(new BlockPos(3, -60, 3)));
 			System.out.println("GORILLACRAFT TEST server mined=" + mined);
+			// The gorilla others see: display entities named after the player, in its colour, and no Steve.
+			String avatar = server.computeOnServer(s -> {
+				var player = s.getPlayerList().getPlayers().getFirst();
+				var parts = s.overworld().getEntities(net.minecraft.world.level.entity.EntityTypeTest.forClass(net.minecraft.world.entity.Display.class),
+						e -> e.getCustomName() != null && e.getCustomName().getString().equals("gorillacraft:" + player.getStringUUID()));
+				String fur = parts.stream().filter(e -> e instanceof net.minecraft.world.entity.Display.BlockDisplay)
+						.map(e -> ((dev.gorillacraft.mixin.BlockDisplayAccess) e).gorillacraft$getBlockState().getBlock().toString())
+						.filter(b -> b.contains("wool")).distinct().toList().toString();
+				return parts.size() + " parts, fur " + fur + ", invisible=" + player.isInvisible();
+			});
+			System.out.println("GORILLACRAFT TEST avatar: " + avatar);
+			if (!avatar.startsWith("8 parts") || !avatar.endsWith("invisible=true") || avatar.contains("black_wool")) {
+				throw new AssertionError("no gorilla avatar on the server: " + avatar);
+			}
 			if (!mined.isAir()) {
 				throw new AssertionError("stone at 3 -60 3 wasn't mined on the server: " + mined);
 			}

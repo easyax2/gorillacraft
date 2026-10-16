@@ -3,7 +3,7 @@
 This guide takes you from a plain Gorilla Tag and Minecraft install to climbing around your
 Minecraft world as a gorilla. Each step says how to check that it worked before you move on.
 
-> **Early release.** GorillaCraft 0.7.2 has been tested end to end with a real Minecraft client
+> **Early release.** GorillaCraft 0.8.0 has been tested end to end with a real Minecraft client
 > and a stand-in for Gorilla Tag, but not yet in a VR headset. Things like the size of blocks and
 > how close your hand has to be may need tuning (see [Settings](#7-settings)). Please report what
 > you find.
@@ -45,7 +45,7 @@ you into it. You don't install anything in Minecraft yourself.
 | **Minecraft: Java Edition** | Owned on your Microsoft account. GorillaCraft uses version 26.3, and Prism downloads it for you. |
 | **[Prism Launcher](https://prismlauncher.org/download/windows/)** | Free Minecraft launcher. GorillaCraft uses it to install and start Minecraft for you. |
 | **A reasonably strong PC** | Both games run at once. Plan for 16 GB of RAM and a GPU that already runs Gorilla Tag comfortably. |
-| **From the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)** | `GorillaCraft.dll`, or `GorillaCraft-0.7.2-GorillaTag.zip` with the same dll already in its folders. The Minecraft mod is inside the dll; the separate `.jar` is only for servers and manual installs. |
+| **From the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)** | `GorillaCraft.dll`, or `GorillaCraft-0.8.0-GorillaTag.zip` with the same dll already in its folders. The Minecraft mod is inside the dll; the separate `.jar` is only for servers and manual installs. |
 
 **Utilla isn't needed.** GorillaCraft works:
 
@@ -109,9 +109,9 @@ You don't need to create an instance or download any mods. GorillaCraft does tha
 **Check:** start Gorilla Tag, then open `BepInEx\LogOutput.log` in Notepad. You should see:
 
 ```
-[Info   :   BepInEx] Loading [GorillaCraft 0.7.2]
+[Info   :   BepInEx] Loading [GorillaCraft 0.8.0]
 [Info   :GorillaCraft] Ready (block colliders on layer 0)
-[Info   :GorillaCraft] Prism instance in C:\Users\...\AppData\Roaming\PrismLauncher: created instance; set window size for the overlay; installed gorillacraft-fabric-0.7.2+26.3.jar; installed fabric-api-0.161.0+26.3.jar
+[Info   :GorillaCraft] Prism instance in C:\Users\...\AppData\Roaming\PrismLauncher: created instance; set window size for the overlay; installed gorillacraft-fabric-0.8.0+26.3.jar; installed fabric-api-0.161.0+26.3.jar
 ```
 
 `BepInEx\config\dev.gorillacraft.cfg` now exists too. That's the settings file (see
@@ -314,7 +314,7 @@ You need [Java 25](https://adoptium.net/) on the server PC.
 4. Open `eula.txt`, change `eula=false` to `eula=true`, save.
 5. Put **two jars** into the new `mods` folder:
    - **Fabric API** for 26.3, from [Modrinth](https://modrinth.com/mod/fabric-api)
-   - `gorillacraft-fabric-0.7.2+26.3.jar` from the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)
+   - `gorillacraft-fabric-0.8.0+26.3.jar` from the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)
 6. Optional, in `server.properties`:
    - `gamemode=creative` (and `force-gamemode=true`) for building, or leave survival
    - `difficulty=peaceful` if you don't want mobs attacking gorillas

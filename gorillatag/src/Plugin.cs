@@ -20,7 +20,7 @@ namespace GorillaCraft
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.7.2";
+        public const string Version = "0.8.0";
 
         internal static ManualLogSource Log;
 
@@ -238,6 +238,16 @@ namespace GorillaCraft
                 }
             }
             return headCamera;
+        }
+
+        /// <summary>Your gorilla's colour as 0xRRGGBB.</summary>
+        private static int GorillaColor()
+        {
+            VRRig rig = GorillaTagger.Instance != null ? GorillaTagger.Instance.offlineVRRig : null;
+            if (rig == null)
+                return 0x202020;
+            Color c = rig.playerColor;
+            return (int)(Mathf.Clamp01(c.r) * 255) << 16 | (int)(Mathf.Clamp01(c.g) * 255) << 8 | (int)(Mathf.Clamp01(c.b) * 255);
         }
 
         /// <summary>Where each eye is, in Unity world space: from the XR eye poses, or head ± half the eye distance.</summary>
@@ -656,9 +666,13 @@ namespace GorillaCraft
             }
             world.Coords.ToMinecraft(leftEye, out double lx, out double ly, out double lz);
             world.Coords.ToMinecraft(rightEye, out double rx, out double ry, out double rz);
+            // Hands and colour, for the gorilla Minecraft shows everyone else.
+            world.Coords.ToMinecraft(player.GetHandFollower(true).position, out double hlx, out double hly, out double hlz);
+            world.Coords.ToMinecraft(player.GetHandFollower(false).position, out double hrx, out double hry, out double hrz);
             link.Send(new FrameWriter(Proto.GtPose).U8(inMap ? 1 : 0).I32(teleportAck)
                 .F64(x).F64(y).F64(z).F32(yaw).F32(pitch)
-                .F64(lx).F64(ly).F64(lz).F64(rx).F64(ry).F64(rz).Finish());
+                .F64(lx).F64(ly).F64(lz).F64(rx).F64(ry).F64(rz)
+                .F64(hlx).F64(hly).F64(hlz).F64(hrx).F64(hry).F64(hrz).I32(GorillaColor()).Finish());
         }
     }
 }

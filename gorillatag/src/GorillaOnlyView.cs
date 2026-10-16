@@ -4,10 +4,11 @@ using UnityEngine;
 namespace GorillaCraft
 {
     /// <summary>
-    /// While you're in the Minecraft map, Gorilla Tag draws nothing of its own except gorillas
-    /// (bodies, cosmetics, name tags): its cameras only see the layers gorilla rigs use, plus
-    /// GorillaCraft's layer (the Minecraft picture, the block highlight, the wrist display), on
-    /// black instead of Gorilla Tag's sky. Restored when you leave.
+    /// While you're in the Minecraft map, Gorilla Tag draws nothing of its own except your own
+    /// gorilla: its cameras only see the layers gorilla rigs use, plus GorillaCraft's layer (the
+    /// Minecraft picture, the block highlight, the wrist display), on black instead of Gorilla
+    /// Tag's sky. Other players' gorillas are drawn by Minecraft (GorillaAvatars), so their Gorilla
+    /// Tag rigs are hidden. Restored when you leave.
     /// </summary>
     public sealed class GorillaOnlyView
     {
@@ -16,6 +17,8 @@ namespace GorillaCraft
 
         private readonly Dictionary<Camera, (int mask, CameraClearFlags clear, Color color, float far)> saved = new Dictionary<Camera, (int, CameraClearFlags, Color, float)>();
         private int rigMask;
+        private readonly HashSet<Renderer> hiddenRenderers = new HashSet<Renderer>();
+        private readonly List<Renderer> otherRigRenderers = new List<Renderer>();
         private int loggedMask;
         private float nextRefresh;
         public bool Active { get; private set; }
@@ -39,6 +42,11 @@ namespace GorillaCraft
                 kv.Key.farClipPlane = kv.Value.far;
             }
             saved.Clear();
+            foreach (Renderer r in hiddenRenderers)
+                if (r != null)
+                    r.enabled = true;
+            hiddenRenderers.Clear();
+            otherRigRenderers.Clear();
         }
 
         /// <summary>Call every frame. Rigs come and go (and change cosmetics), so this refreshes now and then.</summary>
@@ -50,9 +58,15 @@ namespace GorillaCraft
             {
                 nextRefresh = Time.unscaledTime + 2f;
                 rigMask = 0;
+                otherRigRenderers.Clear();
+                VRRig mine = GorillaTagger.Instance != null ? GorillaTagger.Instance.offlineVRRig : null;
                 foreach (VRRig rig in Object.FindObjectsByType<VRRig>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
                     foreach (Renderer r in rig.GetComponentsInChildren<Renderer>(true))
+                    {
                         rigMask |= 1 << r.gameObject.layer;
+                        if (rig != mine && rig != VRRig.LocalRig)
+                            otherRigRenderers.Add(r);
+                    }
                 rigMask |= 1 << Layer;
                 if (rigMask != loggedMask)
                 {
@@ -62,6 +76,15 @@ namespace GorillaCraft
                         if ((rigMask & 1 << i) != 0)
                             names.Add(i + ":" + LayerMask.LayerToName(i));
                     Plugin.Log.LogInfo("Gorilla-only view keeps layers " + string.Join(", ", names));
+                }
+            }
+            // Other gorillas: Minecraft draws them. Gorilla Tag may switch their parts back on, so every frame.
+            foreach (Renderer r in otherRigRenderers)
+            {
+                if (r != null && r.enabled)
+                {
+                    r.enabled = false;
+                    hiddenRenderers.Add(r);
                 }
             }
             foreach (Camera cam in Camera.allCameras)

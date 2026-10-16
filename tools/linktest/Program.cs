@@ -125,6 +125,15 @@ static class Program
         SendPose(true, oldId, 0.5, -58.3, 0.5); // stale: must be ignored
         Pump(200);
         for (int i = 0; i < 10; i++) { SendPose(true, teleport.Id, 10.5, -58.3, 10.5); Pump(50); }
+        // For the screenshot: eyes 2.5 blocks south of the head, looking north at the gorilla's back,
+        // hands reaching forward (north) and out.
+        for (int i = 0; i < 30; i++)
+        {
+            link.Send(new FrameWriter(Proto.GtPose).U8(1).I32(teleport.Id).F64(10.5).F64(-58.3).F64(10.5).F32(180).F32(10)
+                .F64(10.5).F64(-58.0).F64(13.0).F64(10.5).F64(-58.0).F64(13.0)
+                .F64(11.0).F64(-58.7).F64(10.1).F64(9.8).F64(-58.2).F64(10.0).I32(0x3366CC).Finish());
+            Pump(50);
+        }
 
         File.WriteAllText(Path.Combine(dir, "done"), "");
 
@@ -173,7 +182,8 @@ static class Program
     // Eyes 6.4 cm apart. Facing south (+Z), the left eye is towards +X.
     static void SendPose(bool inMap, int ack, double x, double y, double z) =>
         link.Send(new FrameWriter(Proto.GtPose).U8(inMap ? 1 : 0).I32(ack).F64(x).F64(y).F64(z).F32(0).F32(30)
-            .F64(x + 0.032).F64(y).F64(z).F64(x - 0.032).F64(y).F64(z).Finish());
+            .F64(x + 0.032).F64(y).F64(z).F64(x - 0.032).F64(y).F64(z)
+            .F64(x + 0.35).F64(y - 0.6).F64(z + 0.3).F64(x - 0.35).F64(y - 0.6).F64(z + 0.3).I32(0x3366CC).Finish());
 
     static void Use(int x, int y, int z, Proto.Face f, double hx, double hy, double hz) =>
         link.Send(new FrameWriter(Proto.GtUse).I32(x).I32(y).I32(z).U8((int)f).F64(hx).F64(hy).F64(hz).Finish());

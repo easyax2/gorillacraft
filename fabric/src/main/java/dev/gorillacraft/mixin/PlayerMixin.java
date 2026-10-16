@@ -21,6 +21,10 @@ abstract class PlayerMixin {
 		if (GorillaPlayers.isGorilla(self.getUUID())) {
 			self.noPhysics = true;
 			self.resetFallDistance();
+			// Others see a gorilla (GorillaAvatars), not this player's own model.
+			if (!self.level().isClientSide() && !self.isInvisible()) {
+				self.setInvisible(true);
+			}
 		}
 	}
 }

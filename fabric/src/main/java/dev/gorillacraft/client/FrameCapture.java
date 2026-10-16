@@ -119,6 +119,13 @@ final class FrameCapture {
 		Matrix4f inverse = proj.mul(view, new Matrix4f()).invert();
 		boolean zeroToOne = device.getDeviceInfo().isZZeroToOne();
 		float maxDistance = mc.options.getEffectiveRenderDistance() * 16;
+		// Mobs, players and gorillas get depth too (their hitboxes), not just blocks.
+		List<net.minecraft.world.phys.AABB> boxes = new ArrayList<>();
+		for (net.minecraft.world.entity.Entity e : level.entitiesForRendering()) {
+			if (e instanceof net.minecraft.world.entity.LivingEntity && e != mc.player && e.distanceToSqr(pos) < 64 * 64) {
+				boxes.add(e.getBoundingBox());
+			}
+		}
 
 		// Rays on worker threads (reading blocks only) while the GPU copies the picture; the frame
 		// goes out once both are done.
@@ -126,7 +133,7 @@ final class FrameCapture {
 		s.busy = true;
 		CompletableFuture<Void> rays = CompletableFuture.runAsync(() -> {
 			long t0 = System.nanoTime();
-			castRays(s, level, pos, inverse, zeroToOne, w, h, maxDistance);
+			castRays(s, level, pos, inverse, zeroToOne, w, h, maxDistance, boxes);
 			synchronized (this) {
 				rayNanos += System.nanoTime() - t0;
 				if (++rayFrames == 600) {
@@ -206,7 +213,8 @@ final class FrameCapture {
 	 * blocks' visual shapes and fluids. Points are relative to the camera, Minecraft axes; misses
 	 * (sky) go far away.
 	 */
-	private void castRays(Slot s, ClientLevel level, Vec3 cam, Matrix4f inverse, boolean zeroToOne, int w, int h, float maxDistance) {
+	private void castRays(Slot s, ClientLevel level, Vec3 cam, Matrix4f inverse, boolean zeroToOne, int w, int h, float maxDistance,
+			List<net.minecraft.world.phys.AABB> boxes) {
 		int gw = Math.max(2, cfg.overlayGrid);
 		int gh = Math.max(2, Math.round(gw * (float) h / w));
 		if (s.points.length != gw * gh * 3) {
@@ -220,7 +228,7 @@ final class FrameCapture {
 		List<Future<?>> parts = new ArrayList<>();
 		for (int t = 0; t < RAY_THREADS; t++) {
 			int from = gh * t / RAY_THREADS, to = gh * (t + 1) / RAY_THREADS;
-			Runnable rows = () -> castRows(s.points, level, cam, inverse, ndcZ, gw, gh, from, to, reach);
+			Runnable rows = () -> castRows(s.points, level, cam, inverse, ndcZ, gw, gh, from, to, reach, boxes);
 			if (t == RAY_THREADS - 1) {
 				rows.run();
 			} else {
@@ -237,7 +245,7 @@ final class FrameCapture {
 	}
 
 	private static void castRows(float[] points, ClientLevel level, Vec3 cam, Matrix4f inverse, float ndcZ, int gw, int gh, int fromRow, int toRow,
-			float reach) {
+			float reach, List<net.minecraft.world.phys.AABB> boxes) {
 		Vector4f p = new Vector4f();
 		CollisionContext context = CollisionContext.empty();
 		int o = fromRow * gw * 3;
@@ -254,6 +262,12 @@ final class FrameCapture {
 				Vec3 end = cam.add(dx * reach, dy * reach, dz * reach);
 				BlockHitResult hit = level.clip(new ClipContext(cam, end, ClipContext.Block.VISUAL, ClipContext.Fluid.ANY, context));
 				double dist = hit.getType() == HitResult.Type.MISS ? SKY_DISTANCE : hit.getLocation().distanceTo(cam);
+				for (net.minecraft.world.phys.AABB box : boxes) {
+					var at = box.clip(cam, end);
+					if (at.isPresent()) {
+						dist = Math.min(dist, at.get().distanceTo(cam));
+					}
+				}
 				points[o++] = (float) (dx * dist);
 				points[o++] = (float) (dy * dist);
 				points[o++] = (float) (dz * dist);

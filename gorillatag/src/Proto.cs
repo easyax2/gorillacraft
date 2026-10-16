@@ -6,7 +6,7 @@ namespace GorillaCraft
     /// </summary>
     public static class Proto
     {
-        public const int Version = 6;
+        public const int Version = 7;
         public const int MaxFrame = 64 << 20;
 
         // Gorilla Tag → Minecraft

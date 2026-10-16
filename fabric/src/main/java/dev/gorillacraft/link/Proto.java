@@ -6,7 +6,7 @@ package dev.gorillacraft.link;
  * length counts the type byte and the payload.
  */
 public final class Proto {
-	public static final int VERSION = 6;
+	public static final int VERSION = 7;
 	public static final int MAX_FRAME = 64 << 20;
 
 	// Gorilla Tag → Minecraft
