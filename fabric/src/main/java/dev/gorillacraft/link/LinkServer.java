@@ -32,6 +32,7 @@ public final class LinkServer {
 	private final ConcurrentLinkedQueue<Inbound> inbound = new ConcurrentLinkedQueue<>();
 	private volatile Connection current;
 	private int connectionCounter;
+	private volatile boolean listening;
 
 	public LinkServer(int port) {
 		this.port = port;
@@ -46,6 +47,11 @@ public final class LinkServer {
 	/** Next frame from Gorilla Tag, or null. */
 	public Inbound poll() {
 		return inbound.poll();
+	}
+
+	/** Whether the port is ours (false: something else, like another Minecraft with GorillaCraft, has it). */
+	public boolean listening() {
+		return listening;
 	}
 
 	public boolean connected() {
@@ -78,6 +84,7 @@ public final class LinkServer {
 			try (ServerSocket server = new ServerSocket()) {
 				server.setReuseAddress(true);
 				server.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), port));
+				listening = true;
 				GorillaCraft.LOG.info("Waiting for Gorilla Tag on 127.0.0.1:{}", port);
 				while (true) {
 					Socket socket = server.accept();
@@ -92,6 +99,7 @@ public final class LinkServer {
 					c.start();
 				}
 			} catch (IOException e) {
+				listening = false;
 				GorillaCraft.LOG.error("Link server on port {} failed, retrying in 5 s", port, e);
 				try {
 					Thread.sleep(5000);

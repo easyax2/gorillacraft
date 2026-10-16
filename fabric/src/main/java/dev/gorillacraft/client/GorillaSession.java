@@ -9,7 +9,6 @@ import dev.gorillacraft.link.LinkServer;
 import dev.gorillacraft.link.Proto;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.client.player.LocalPlayer;
@@ -36,21 +35,8 @@ public final class GorillaSession {
 	private final ClientConfig cfg;
 	private final SectionStreamer streamer = new SectionStreamer();
 	private final AtlasExporter atlas = new AtlasExporter();
-	private final MenuActions menu;
-	private final FrameCapture frames;
-	private final GuiCapture gui;
-	private dev.gorillacraft.link.SharedFrames shared;
-	private boolean sharedActive;
-	private int pointerButtons;
-	private String lastHeld = "";
-	private int savedFps;
-	private boolean savedVsync;
-	private net.minecraft.client.InactivityFpsLimit savedInactivity;
 	/** What Gorilla Tag asked for in its hello (Proto.WANT_*). */
 	private int wants = Proto.WANT_BLOCK_MESHES;
-	private boolean overlayWasActive;
-	private boolean savedHideGui;
-	private boolean savedBobView;
 
 	private int connection;
 	private ClientLevel worldSentFor;
@@ -62,15 +48,11 @@ public final class GorillaSession {
 	private boolean havePose;
 	private int poseAck;
 	private double poseX, poseY, poseZ;
-	/** Eye positions (Minecraft coordinates), for per-eye frames. */
-	private final double[][] eyes = new double[2][3];
 	/** Hand positions (Minecraft coordinates) and the gorilla's colour, for the avatar others see. */
 	private Vec3 leftHand = Vec3.ZERO, rightHand = Vec3.ZERO;
 	private int gorillaColor = 0x202020;
 	/** Gorilla Tag's bone pose (GT_BONES), relative to the head, for the real gorilla model. */
 	private float[] bones = new float[0];
-	/** Which eye the next overlay frame is drawn for. */
-	private int nextEye = Proto.EYE_LEFT;
 	private float poseYaw, posePitch;
 
 	/** Bumped each time Minecraft moves the player itself; Gorilla Tag must ack it. */
@@ -89,9 +71,10 @@ public final class GorillaSession {
 	GorillaSession(LinkServer link, ClientConfig cfg) {
 		this.link = link;
 		this.cfg = cfg;
-		this.menu = new MenuActions(link, this::status);
-		this.frames = new FrameCapture(link, cfg, this::sharedFrames);
-		this.gui = new GuiCapture(link, this::sharedFrames);
+	}
+
+	public boolean connected() {
+		return connection != 0;
 	}
 
 	/** True while Gorilla Tag is moving the Minecraft player. */
@@ -116,8 +99,6 @@ public final class GorillaSession {
 				handle(mc, msg);
 			}
 		}
-
-		menu.tick(mc);
 
 		ClientLevel level = mc.level;
 		LocalPlayer player = mc.player;
@@ -149,7 +130,7 @@ public final class GorillaSession {
 			}
 		}
 
-		// The Minecraft window is hidden behind Gorilla Tag; losing focus must not pause the game.
+		// You're in the headset, not at Minecraft's window: losing focus must not pause the game.
 		mc.options.pauseOnLostFocus = false;
 
 		if ((wants & Proto.WANT_BLOCK_MESHES) != 0 && !atlasSent && !atlas.pending()) {
@@ -165,7 +146,6 @@ public final class GorillaSession {
 
 		updatePresence(mc);
 		sendAvatarPose(mc);
-		updateOverlay(mc);
 		tickScreens(mc, player);
 		tickMining(mc, player);
 		tickHotbar(player);
@@ -174,8 +154,6 @@ public final class GorillaSession {
 
 	private void onConnectionChanged(int cid) {
 		connection = cid;
-		sharedActive = false;
-		lastHeld = "\u0000";
 		wants = Proto.WANT_BLOCK_MESHES;
 		worldSentFor = null;
 		noWorldSent = false;
@@ -186,6 +164,7 @@ public final class GorillaSession {
 		mineTarget = null;
 		lastHotbar = "";
 		streamer.reset();
+		setRig(null);
 		if (cid != 0) {
 			link.send(new FrameWriter(Proto.MC_WELCOME).i32(Proto.VERSION).finish());
 		}
@@ -197,11 +176,7 @@ public final class GorillaSession {
 				int version = m.i32();
 				String gt = m.str();
 				wants = version >= 3 ? m.u8() : Proto.WANT_BLOCK_MESHES;
-				frames.reset();
 				streamer.reset(); // resend sections in the form it wants
-				if ((wants & Proto.WANT_SHM) != 0) {
-					offerSharedFrames();
-				}
 				GorillaCraft.LOG.info("Gorilla Tag plugin {} (protocol {}) connected", gt, version);
 				if (version != Proto.VERSION) {
 					status("Protocol mismatch: Gorilla Tag plugin speaks " + version + ", Minecraft mod speaks " + Proto.VERSION + ". Update both halves.");
@@ -215,14 +190,18 @@ public final class GorillaSession {
 				poseZ = m.f64();
 				poseYaw = m.f32();
 				posePitch = m.f32();
-				for (double[] eye : eyes) {
-					eye[0] = m.f64();
-					eye[1] = m.f64();
-					eye[2] = m.f64();
-				}
 				leftHand = new Vec3(m.f64(), m.f64(), m.f64());
 				rightHand = new Vec3(m.f64(), m.f64(), m.f64());
 				gorillaColor = m.i32();
+				if (m.u8() != 0) {
+					double[] rig = new double[12];
+					for (int i = 0; i < 12; i++) {
+						rig[i] = m.f64();
+					}
+					setRig(nowInMap && poseAck >= teleportId ? rig : null);
+				} else {
+					setRig(null);
+				}
 				havePose = true;
 				if (nowInMap && !inMap) {
 					inMap = true;
@@ -259,12 +238,6 @@ public final class GorillaSession {
 					mc.player.getInventory().setSelectedSlot(slot);
 				}
 			}
-			case Proto.GT_LIST_WORLDS -> menu.listWorlds(mc);
-			case Proto.GT_OPEN_WORLD -> menu.openWorld(mc, m.str());
-			case Proto.GT_JOIN_SERVER -> menu.joinServer(mc, m.str());
-			case Proto.GT_LEAVE_WORLD -> menu.leave(mc);
-			case Proto.GT_INVENTORY -> toggleInventory(mc, m.u8() != 0);
-			case Proto.GT_POINTER -> pointer(mc, m.f32(), m.f32(), m.u8());
 			case Proto.GT_MODEL -> GorillaMeshes.readModel(m);
 			case Proto.GT_BONES -> {
 				Vec3 ref = new Vec3(m.f64(), m.f64(), m.f64());
@@ -276,16 +249,6 @@ public final class GorillaSession {
 				if (mc.player != null) {
 					GorillaMeshes.setPose(mc.player.getUUID(), ref, gorillaColor, b);
 				}
-			}
-			case Proto.GT_SHM -> {
-				sharedActive = m.u8() != 0 && shared != null;
-				GorillaCraft.LOG.info(sharedActive ? "Gorilla Tag maps the shared frames: frames go through shared memory"
-						: "Gorilla Tag couldn't map the shared frames: frames go through the socket");
-			}
-			case Proto.GT_SCROLL -> {
-				float dy = m.f32();
-				var w = mc.getWindow();
-				mc.mouseHandler.onScroll(w.handle(), 0, dy);
 			}
 			default -> GorillaCraft.LOG.warn("Unknown message 0x{} from Gorilla Tag", Integer.toHexString(m.type));
 		}
@@ -301,155 +264,45 @@ public final class GorillaSession {
 				gorillaColor, bones));
 	}
 
-	/** The shared frame memory, once Gorilla Tag has confirmed it can read it; else null (use the socket). */
-	private dev.gorillacraft.link.SharedFrames sharedFrames() {
-		return sharedActive ? shared : null;
-	}
+	/** Inverse of xrizer's Touch grip offset: rotate -20.6° about X, then back off the grip point. */
+	private static final org.joml.Quaternionf GRIP_TO_RAW_ROT = new org.joml.Quaternionf().rotationX((float) Math.toRadians(-20.6));
+	private static final org.joml.Vector3f[] GRIP_TO_RAW_POS = {
+			GRIP_TO_RAW_ROT.transform(new org.joml.Vector3f(-0.007f, 0.00182941f, -0.1019482f)),
+			GRIP_TO_RAW_ROT.transform(new org.joml.Vector3f(0.007f, 0.00182941f, -0.1019482f))};
 
-	private void offerSharedFrames() {
-		try {
-			if (shared == null) {
-				shared = dev.gorillacraft.link.SharedFrames.create(cfg.port);
-				var created = shared;
-				Runtime.getRuntime().addShutdownHook(new Thread(created::close, "GorillaCraft shared frames cleanup"));
-			}
-			link.send(new FrameWriter(Proto.MC_SHM).str(shared.path().toString()).f64(shared.size()).finish());
-		} catch (java.io.IOException | RuntimeException e) {
-			GorillaCraft.LOG.warn("No shared memory for frames ({}), using the socket", e.toString());
-		}
-	}
-
-	/** True while Minecraft draws the gorilla's view for Gorilla Tag's overlay. */
-	public boolean overlayActive() {
-		return (wants & Proto.WANT_FRAMES) != 0 && driving() && havePose && poseAck >= teleportId;
-	}
-
-	private boolean stereo() {
-		return (wants & Proto.WANT_STEREO) != 0;
-	}
-
-	/** Which eye the camera draws for this frame: left and right take turns, or the head's centre. */
-	public int cameraEye() {
-		return stereo() ? nextEye : Proto.EYE_CENTER;
-	}
-
-	public double cameraX() {
-		return cameraEye() == Proto.EYE_CENTER ? poseX : eyes[cameraEye()][0];
-	}
-
-	public double cameraY() {
-		return cameraEye() == Proto.EYE_CENTER ? poseY : eyes[cameraEye()][1];
-	}
-
-	public double cameraZ() {
-		return cameraEye() == Proto.EYE_CENTER ? poseZ : eyes[cameraEye()][2];
-	}
-
-	public float poseYaw() {
-		return poseYaw;
-	}
-
-	public float posePitch() {
-		return posePitch;
-	}
-
-	public float overlayFov() {
-		return cfg.overlayFov;
-	}
-
-	/** Called after every finished frame (GUI included). */
-	public void onFrameFinished() {
-		Minecraft mc = Minecraft.getInstance();
-		gui.capture(mc, driving() && mc.gui.screen() != null);
-	}
-
-	/**
-	 * Opens or closes Minecraft's inventory (creative or survival: Minecraft picks), or closes
-	 * whatever screen is open (a chest, a crafting table...).
-	 */
-	private void toggleInventory(Minecraft mc, boolean open) {
-		LocalPlayer player = mc.player;
-		if (player == null || !driving()) {
-			return;
-		}
-		if (mc.gui.screen() != null) {
-			if (!open) {
-				mc.gui.screen().onClose();
-			}
-			return;
-		}
-		if (open) {
-			mc.gui.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(player));
+	/** Gorilla Tag's rig (tracking space → Minecraft), for the headset's camera; null when it isn't driving. */
+	private void setRig(double[] rig) {
+		var vr = dev.gorillacraft.client.vr.VrRenderer.get();
+		if (vr != null) {
+			vr.setGorillaRig(rig);
 		}
 	}
 
 	/**
-	 * Gorilla Tag's laser pointer on the panel: u/v across Minecraft's window (0..1 from the top
-	 * left) and the buttons held (bit 0 left, bit 1 right). Goes through Minecraft's own mouse
-	 * handling, so clicking, dragging and shift-free item moving work as with a real mouse.
+	 * The headset and controllers for Gorilla Tag (which runs without VR of its own): tracking
+	 * space, OpenXR axes, sent every frame. While a screen is open the triggers and grips belong
+	 * to the panel, so Gorilla Tag gets them released.
 	 */
-	private void pointer(Minecraft mc, float u, float v, int buttons) {
-		if (mc.gui.screen() == null) {
-			pointerButtons = 0;
+	public void sendTracking(org.joml.Vector3f head, org.joml.Quaternionf headRot, dev.gorillacraft.client.vr.XrInput in, boolean screen) {
+		if (connection == 0) {
 			return;
 		}
-		var window = mc.getWindow();
-		double x = Math.clamp(u, 0f, 1f) * window.getScreenWidth();
-		double y = Math.clamp(v, 0f, 1f) * window.getScreenHeight();
-		mc.mouseHandler.onMove(window.handle(), x, y, 0, 0);
-		for (int b = 0; b < 2; b++) {
-			boolean now = (buttons & 1 << b) != 0, was = (pointerButtons & 1 << b) != 0;
-			if (now != was) {
-				mc.mouseHandler.onButton(window.handle(), new net.minecraft.client.input.MouseButtonInfo(b, 0), now ? 1 : 0);
-			}
+		int flags = 1 | (in.gripValid[0] ? 2 : 0) | (in.gripValid[1] ? 4 : 0) | (screen ? 8 : 0);
+		FrameWriter w = new FrameWriter(Proto.MC_TRACKING, 160).u8(flags);
+		w.f32(head.x).f32(head.y).f32(head.z).f32(headRot.x).f32(headRot.y).f32(headRot.z).f32(headRot.w);
+		for (int h = 0; h < 2; h++) {
+			// SteamVR's controller pose (Gorilla Tag's hand offsets are tuned for it), from the grip
+			// pose the way xrizer does it for Touch controllers.
+			org.joml.Quaternionf q = new org.joml.Quaternionf(in.gripRot[h]).mul(GRIP_TO_RAW_ROT);
+			org.joml.Vector3f p = in.gripRot[h].transform(new org.joml.Vector3f(GRIP_TO_RAW_POS[h])).add(in.gripPos[h]);
+			w.f32(p.x).f32(p.y).f32(p.z).f32(q.x).f32(q.y).f32(q.z).f32(q.w);
 		}
-		pointerButtons = buttons;
-	}
-
-	/** Called after every rendered frame. */
-	public void onFrameRendered() {
-		if (overlayActive() && frames.capture(Minecraft.getInstance(), cameraEye()) && stereo()) {
-			nextEye = 1 - nextEye; // that eye is on its way: draw the other one next
+		for (int h = 0; h < 2; h++) {
+			w.f32(screen ? 0 : in.trigger_[h]).f32(screen ? 0 : in.squeeze_[h]).f32(in.stickX[h]).f32(in.stickY[h]);
 		}
-	}
-
-	/**
-	 * While overlaying, Minecraft's picture must be just the world: no HUD, no hand, no view
-	 * bobbing. The hand is skipped in GameRendererMixin. Restored afterwards.
-	 */
-	private void updateOverlay(Minecraft mc) {
-		boolean active = overlayActive();
-		if (active) {
-			mc.getFramerateLimitTracker().onInputReceived();
-		}
-		if (active == overlayWasActive) {
-			return;
-		}
-		overlayWasActive = active;
-		if (active) {
-			// Minecraft's frames are what you see: no frame cap, no vsync, and no slowing down
-			// because nobody has touched its window for a while.
-			savedFps = mc.options.framerateLimit().get();
-			savedVsync = mc.options.enableVsync().get();
-			savedInactivity = mc.options.inactivityFpsLimit().get();
-			mc.options.framerateLimit().set(260);
-			mc.options.enableVsync().set(false);
-			mc.options.inactivityFpsLimit().set(net.minecraft.client.InactivityFpsLimit.MINIMIZED);
-			savedHideGui = mc.gui.hud.isHidden();
-			savedBobView = mc.options.bobView().get();
-			if (!savedHideGui) {
-				mc.gui.hud.toggle();
-			}
-			mc.options.bobView().set(false);
-		} else {
-			mc.options.framerateLimit().set(savedFps);
-			mc.options.enableVsync().set(savedVsync);
-			mc.options.inactivityFpsLimit().set(savedInactivity);
-			if (mc.gui.hud.isHidden() != savedHideGui) {
-				mc.gui.hud.toggle();
-			}
-			mc.options.bobView().set(savedBobView);
-		}
+		int buttons = (in.primary_[0] ? 1 : 0) | (in.primary_[1] ? 2 : 0) | (in.secondary_[0] ? 4 : 0) | (in.secondary_[1] ? 8 : 0)
+				| (in.stickClick_[0] ? 16 : 0) | (in.stickClick_[1] ? 32 : 0) | (in.menu_ ? 64 : 0);
+		link.send(w.u16(buttons).finish());
 	}
 
 	/** "World name" in singleplayer, the server's address in multiplayer. */
@@ -560,11 +413,7 @@ public final class GorillaSession {
 		}
 	}
 
-	/**
-	 * Minecraft's window is hidden behind Gorilla Tag, so nobody can click its screens. While
-	 * driving: respawn straight away after dying, and close container screens (chests, furnaces)
-	 * that a hand interaction opened, since Gorilla Tag can't show them yet.
-	 */
+	/** While driving: respawn straight away after dying (the gorilla keeps going). */
 	private void tickScreens(Minecraft mc, LocalPlayer player) {
 		if (!driving()) {
 			return;
@@ -596,47 +445,6 @@ public final class GorillaSession {
 			lastHotbar = k;
 			link.send(w.finish());
 		}
-		sendHeldItem(player.getMainHandItem());
-	}
-
-	/**
-	 * The held item's texture, for Gorilla Tag to put in the gorilla's hand: the item's own
-	 * texture, or for blocks the block's texture (side, then top, for blocks like grass and logs).
-	 */
-	private void sendHeldItem(ItemStack stack) {
-		String id = stack.isEmpty() ? "" : net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
-		if (id.equals(lastHeld)) {
-			return;
-		}
-		lastHeld = id;
-		FrameWriter w = new FrameWriter(Proto.MC_HELD);
-		if (stack.isEmpty()) {
-			link.send(w.u8(0).i32(0).finish());
-			return;
-		}
-		var rm = Minecraft.getInstance().getResourceManager();
-		net.minecraft.resources.Identifier key = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem());
-		java.util.List<String> tries = new java.util.ArrayList<>();
-		boolean block = stack.getItem() instanceof net.minecraft.world.item.BlockItem;
-		if (block) {
-			var b = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(((net.minecraft.world.item.BlockItem) stack.getItem()).getBlock());
-			for (String suffix : new String[] {"", "_side", "_top", "_front", "_0"}) {
-				tries.add(b.getNamespace() + ":textures/block/" + b.getPath() + suffix + ".png");
-			}
-		}
-		tries.add(key.getNamespace() + ":textures/item/" + key.getPath() + ".png");
-		for (String t : tries) {
-			var res = rm.getResource(net.minecraft.resources.Identifier.parse(t));
-			if (res.isPresent()) {
-				try (var in = res.get().open()) {
-					byte[] png = in.readAllBytes();
-					link.send(w.u8(block && !t.contains("/item/") ? 2 : 1).i32(png.length).bytes(png).finish());
-					return;
-				} catch (java.io.IOException ignored) {
-				}
-			}
-		}
-		link.send(w.u8(0).i32(0).finish());
 	}
 
 	private void status(String text) {

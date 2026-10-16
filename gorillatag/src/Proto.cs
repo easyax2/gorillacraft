@@ -6,7 +6,7 @@ namespace GorillaCraft
     /// </summary>
     public static class Proto
     {
-        public const int Version = 8;
+        public const int Version = 9;
         public const int MaxFrame = 64 << 20;
 
         // Gorilla Tag → Minecraft
@@ -15,14 +15,6 @@ namespace GorillaCraft
         public const byte GtMine = 0x03;
         public const byte GtUse = 0x04;
         public const byte GtSlot = 0x05;
-        public const byte GtListWorlds = 0x06;
-        public const byte GtOpenWorld = 0x07;
-        public const byte GtJoinServer = 0x08;
-        public const byte GtLeaveWorld = 0x09;
-        public const byte GtInventory = 0x0A;
-        public const byte GtPointer = 0x0B;
-        public const byte GtScroll = 0x0C;
-        public const byte GtShm = 0x0D;
         public const byte GtModel = 0x0E;
         public const byte GtBones = 0x0F;
 
@@ -35,19 +27,10 @@ namespace GorillaCraft
         public const byte McTeleport = 0x86;
         public const byte McHotbar = 0x87;
         public const byte McStatus = 0x88;
-        public const byte McWorlds = 0x89;
-        public const byte McFrame = 0x8A;
-        public const byte McGuiFrame = 0x8B;
-        public const byte McHeld = 0x8C;
-        public const byte McShm = 0x8D;
+        public const byte McTracking = 0x8E;
 
         /// <summary>HELLO flags: what Gorilla Tag wants from Minecraft.</summary>
         public const byte WantBlockMeshes = 1;
-        public const byte WantFrames = 2;
-        public const byte WantStereo = 4;
-        public const byte WantShm = 8;
-
-        public const byte EyeLeft = 0, EyeRight = 1, EyeCenter = 2;
 
         public const byte ShapeFullCube = 0xFF;
 

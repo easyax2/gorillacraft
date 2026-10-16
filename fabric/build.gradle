@@ -13,6 +13,12 @@ dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// OpenXR for VR: Minecraft already ships the rest of LWJGL 3.4.3. The loader natives are a
+	// fallback; the system's OpenXR loader (libopenxr_loader.so.1) is used when there is one.
+	include(implementation("org.lwjgl:lwjgl-openxr:${project.lwjgl_version}"))
+	include("org.lwjgl:lwjgl-openxr:${project.lwjgl_version}:natives-linux")
+	include("org.lwjgl:lwjgl-openxr:${project.lwjgl_version}:natives-windows")
 }
 
 processResources {
@@ -40,5 +46,17 @@ fabricApi {
 		eula = true
 		enableGameTests = false
 		enableClientGameTests = true
+	}
+}
+
+loom {
+	runs {
+		// VR test: opens (or creates) a world straight away. GORILLACRAFT_VR=1 turns VR on in dev runs.
+		vrClient {
+			client()
+			name "VR Client"
+			vmArg "-Dgorillacraft.autoWorld=GorillaCraft VR Test"
+			runDir "run"
+		}
 	}
 }

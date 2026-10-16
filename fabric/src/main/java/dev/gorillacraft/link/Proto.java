@@ -6,7 +6,7 @@ package dev.gorillacraft.link;
  * length counts the type byte and the payload.
  */
 public final class Proto {
-	public static final int VERSION = 8;
+	public static final int VERSION = 9;
 	public static final int MAX_FRAME = 64 << 20;
 
 	// Gorilla Tag → Minecraft
@@ -15,14 +15,6 @@ public final class Proto {
 	public static final int GT_MINE = 0x03;
 	public static final int GT_USE = 0x04;
 	public static final int GT_SLOT = 0x05;
-	public static final int GT_LIST_WORLDS = 0x06;
-	public static final int GT_OPEN_WORLD = 0x07;
-	public static final int GT_JOIN_SERVER = 0x08;
-	public static final int GT_LEAVE_WORLD = 0x09;
-	public static final int GT_INVENTORY = 0x0A;
-	public static final int GT_POINTER = 0x0B;
-	public static final int GT_SCROLL = 0x0C;
-	public static final int GT_SHM = 0x0D;
 	public static final int GT_MODEL = 0x0E;
 	public static final int GT_BONES = 0x0F;
 
@@ -35,23 +27,10 @@ public final class Proto {
 	public static final int MC_TELEPORT = 0x86;
 	public static final int MC_HOTBAR = 0x87;
 	public static final int MC_STATUS = 0x88;
-	public static final int MC_WORLDS = 0x89;
-	public static final int MC_FRAME = 0x8A;
-	public static final int MC_GUI_FRAME = 0x8B;
-	public static final int MC_HELD = 0x8C;
-	public static final int MC_SHM = 0x8D;
+	public static final int MC_TRACKING = 0x8E;
 
 	/** GT_HELLO flags: what Gorilla Tag wants. */
 	public static final int WANT_BLOCK_MESHES = 1;
-	public static final int WANT_FRAMES = 2;
-	/** Frames alternate between the two eyes' positions (with WANT_FRAMES). */
-	public static final int WANT_STEREO = 4;
-	/** Frames through shared memory (SharedFrames) instead of the socket, if Gorilla Tag can map it. */
-	public static final int WANT_SHM = 8;
-
-	public static final int EYE_LEFT = 0;
-	public static final int EYE_RIGHT = 1;
-	public static final int EYE_CENTER = 2;
 
 	/** Block shape entry flag: the block's outline is the full unit cube. */
 	public static final int SHAPE_FULL_CUBE = 0xFF;

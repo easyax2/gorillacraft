@@ -1,43 +1,59 @@
 package dev.gorillacraft.mixin.client;
 
-import dev.gorillacraft.client.GorillaCraftClient;
-import dev.gorillacraft.client.GorillaSession;
+import dev.gorillacraft.client.vr.VrRenderer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.world.phys.Vec3;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * In overlay mode Minecraft draws what the gorilla sees: every frame the camera goes to Gorilla
- * Tag's latest pose (not the player's tick-interpolated position), at one eye or the other in
- * turn for per-eye frames, with a wide, fixed field of view that covers some head turning.
+ * In VR the camera is your head: the middle of your eyes, turned the way your head is (roll
+ * included), with a culling frustum that holds both eyes. Minecraft extracts the world from
+ * here; each eye's own view is set just before that eye is drawn (VrRenderer).
  */
 @Mixin(Camera.class)
 public abstract class CameraMixin {
 	@Shadow
-	protected abstract void setPosition(double x, double y, double z);
+	protected abstract void setPosition(Vec3 position);
 
 	@Shadow
 	protected abstract void setRotation(float yRot, float xRot);
 
-	@Inject(method = "update", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Camera;alignWithEntity(F)V", shift = At.Shift.AFTER))
-	private void gorillacraft$headPose(DeltaTracker deltaTracker, CallbackInfo ci) {
-		GorillaSession session = GorillaCraftClient.session();
-		if (session != null && session.overlayActive()) {
-			setPosition(session.cameraX(), session.cameraY(), session.cameraZ());
-			setRotation(session.poseYaw(), session.posePitch());
-		}
-	}
+	@Shadow
+	private Frustum cullFrustum;
 
-	@Inject(method = "calculateFov", at = @At("HEAD"), cancellable = true)
-	private void gorillacraft$wideFov(float partialTicks, CallbackInfoReturnable<Float> cir) {
-		GorillaSession session = GorillaCraftClient.session();
-		if (session != null && session.overlayActive()) {
-			cir.setReturnValue(session.overlayFov());
+	@Shadow
+	@Final
+	private Quaternionf rotation;
+
+	@Shadow
+	private float depthFar;
+
+	@Shadow
+	private boolean initialized;
+
+	@Inject(method = "update", at = @At("TAIL"))
+	private void gorillacraft$head(DeltaTracker deltaTracker, CallbackInfo ci) {
+		VrRenderer vr = VrRenderer.get();
+		if (vr == null || !vr.active() || !initialized) {
+			return;
 		}
+		Quaternionf head = vr.headWorldRotation();
+		Vector3f forward = head.transform(new Vector3f(0, 0, -1));
+		float yaw = (float) Math.toDegrees(Math.atan2(-forward.x, forward.z));
+		float pitch = (float) Math.toDegrees(-Math.asin(Math.clamp(forward.y, -1f, 1f)));
+		setRotation(yaw, pitch);
+		rotation.set(head);
+		setPosition(vr.headWorld());
+		cullFrustum = vr.cullFrustum(depthFar,
+				com.mojang.blaze3d.systems.RenderSystem.getDevice().getDeviceInfo().isZZeroToOne());
 	}
 }

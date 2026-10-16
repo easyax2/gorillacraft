@@ -1,5 +1,6 @@
 package dev.gorillacraft.client;
 
+import dev.gorillacraft.client.vr.VrRenderer;
 import dev.gorillacraft.link.LinkServer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -22,7 +23,12 @@ public class GorillaCraftClient implements ClientModInitializer {
 		LinkServer link = new LinkServer(cfg.port);
 		link.start();
 		session = new GorillaSession(link, cfg);
+		VrRenderer.init(cfg);
 		ClientTickEvents.END_CLIENT_TICK.register(session::tick);
+		if (cfg.launchGorillaTag) {
+			GorillaTagLauncher launcher = new GorillaTagLauncher();
+			ClientTickEvents.END_CLIENT_TICK.register(mc -> launcher.tick(mc, session, link.listening()));
+		}
 		AutoWorld autoWorld = new AutoWorld();
 		ClientTickEvents.END_CLIENT_TICK.register(autoWorld::tick);
 		// Other gorillas as Gorilla Tag's real model.

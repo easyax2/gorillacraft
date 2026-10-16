@@ -179,7 +179,6 @@ namespace GorillaCraft
                 go.name = "GorillaCraft Highlight";
                 Object.Destroy(go.GetComponent<Collider>());
                 Object.DontDestroyOnLoad(go);
-                GorillaOnlyView.Assign(go);
                 material = MinecraftWorld.MakeMaterial(shader, 2, Texture2D.whiteTexture);
                 go.GetComponent<MeshRenderer>().sharedMaterial = material;
                 go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;

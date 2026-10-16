@@ -1,84 +1,103 @@
 # GorillaCraft
 
-Minecraft inside Gorilla Tag. You stay a gorilla (Gorilla Tag's arm locomotion, in VR) and see
-Minecraft's own graphics around you: Minecraft draws the world from your gorilla head, and Gorilla
-Tag shows that picture in 3D around you. You climb Minecraft's blocks, punch them out with
-Minecraft's mining rules, and place blocks, open doors and flip levers with your hands.
+Play Minecraft in VR as a Gorilla Tag gorilla. **Minecraft is the VR game**: it renders both eyes
+itself through OpenXR (WiVRn, SteamVR, Oculus...) with all of its own graphics. **Gorilla Tag
+provides the gorilla**: when Minecraft starts it starts Gorilla Tag in the background, without
+VR, and Gorilla Tag's own arm locomotion moves you around Minecraft's blocks. Its real gorilla
+model is what you (and everyone else) see in Minecraft. You climb Minecraft's blocks, punch them
+out with Minecraft's mining rules, and place blocks, open doors and flip levers with your hands.
 
 Modelled on [SkyCraft](https://github.com/RyanCraighead/SkyCraft) (Minecraft in Skyrim) and its
-rule that **neither game is rewritten**: Minecraft runs its own game in the background and does the
-world (blocks, meshing, lighting, mining, placement rules, saving), Gorilla Tag does the gorilla.
-Two small mods translate between them. Authority is split the other way round from SkyCraft:
-there, Minecraft owns the player and Skyrim the world; here, Gorilla Tag owns the player and
-Minecraft the world.
+rule that **neither game is rewritten**: Minecraft does the world and the picture (blocks,
+lighting, mining, placement rules, saving), Gorilla Tag does the gorilla's movement. Two small mods
+translate between them.
 
 Tag features aren't in yet. This is interactions and maps only.
 
+## How it fits together
+
+```
+ headset + controllers ──OpenXR──> Minecraft (Fabric mod)  ──tracking──>  Gorilla Tag (BepInEx plugin, no VR)
+                                    draws both eyes            <──rig, bones, punches──  gorilla locomotion on
+                                    + menus, your gorilla                                  Minecraft's blocks (colliders)
+```
+
+Every frame Minecraft sends the headset and controllers to Gorilla Tag, which puts them on its
+gorilla. Gorilla Tag's physics move the gorilla through Minecraft's blocks (they're invisible
+colliders there) and send back where its rig ended up. Minecraft draws your eyes through that
+rig, so where you are in Minecraft is where Gorilla Tag's physics put you. Your head itself
+always comes straight from the headset (no added latency); only movement goes through Gorilla
+Tag.
+
 ## What works
 
-- **Minecraft's real graphics (overlay), per eye:** Minecraft renders the view from your left
-  and right eye in turn (world, mobs, items, sky, day and night, weather, particles, lighting, resource
-  packs, shaders it supports). Gorilla Tag shows that picture on a 3D surface built from where
-  each part of it is, so it has real depth in VR, stays fixed in the world when you turn your
-  head, and gorillas and hands sort against it. Gorilla Tag draws nothing of its own while you're
-  in the map except gorillas: no Gorilla Tag sky or scenery, black outside Minecraft's view.
-- **Maps:** any Minecraft world, singleplayer or a server. Its collision shapes are real (but
-  invisible) Gorilla Tag colliders you can climb, streamed in around you (4 chunks by default).
-  The older mode, where Gorilla Tag draws Minecraft's block meshes itself, is still there as
-  `Rendering.Mode = Blocks`.
-- **Mining:** punch a block (hard, straight into it). Each punch keeps Minecraft mining it for a moment, so creative
-  breaks in one hit and survival takes as many punches as Minecraft's break time. Tools and drops
-  are Minecraft's. Optional fist mode: only punches with grip held count, so climbing never
-  breaks blocks.
+- **Minecraft in VR (OpenXR):** each eye drawn with its own position and field of view, at the
+  headset's resolution and refresh rate. Works with any OpenXR runtime that takes OpenGL
+  (WiVRn and Monado on Linux, SteamVR/Oculus on Windows). The desktop window mirrors an eye.
+  Nobody wearing the headset: Minecraft plays normally on the monitor.
+- **Starts Gorilla Tag for you:** launching the GorillaCraft instance starts Gorilla Tag through
+  Steam (`-gorillacraft`), in a small window, muted, with VR off and its cameras off.
+- **Gorilla movement:** Gorilla Tag's own locomotion (climbing, jumping, sliding, snap turn) on
+  Minecraft's blocks, streamed around you (4 chunks by default).
+- **Your gorilla:** Gorilla Tag's real gorilla model, read from your own installed Gorilla Tag at
+  runtime (nothing from the game is shipped), posed with Gorilla Tag's bones. You see your own
+  arms and body (not the head you're inside); everyone else sees the whole gorilla.
+- **Mining:** punch a block (hard, straight into it). Each punch keeps Minecraft mining it for a
+  moment, so creative breaks in one hit and survival takes as many punches as Minecraft's break
+  time. Optional fist mode: only punches with grip held count.
 - **Using:** press **grip** with a hand on a block to right-click it with your held item (the
-  trigger, in fist mode). That places blocks, opens doors and trapdoors, presses buttons and
-  flips levers.
-- **Main menu** on your monitor (F1), with mouse and keyboard: pick or create a singleplayer
-  world, join a server, enter or leave the map, change settings.
-- **Hotbar:** **A** = next slot, **X** = previous slot. The hotbar and status are on your left
-  wrist, and the held item is in your gorilla's hand.
-- **Inventory:** tap **Y**: Minecraft's own inventory (and chests, crafting tables, furnaces)
-  on a panel you point at and click with your right hand.
-- **Live changes:** anything that changes in Minecraft (you, other players, redstone, water,
-  explosions) updates in Gorilla Tag.
-- **Gorillas in Minecraft:** every GorillaCraft player is a gorilla in the Minecraft world.
-  Players with GorillaCraft see **Gorilla Tag's real gorilla**: the model and textures are read
-  from their own installed Gorilla Tag at runtime (nothing from the game is shipped), and it moves
-  with Gorilla Tag's own bones (arm IK and all), relayed by the server. Players without the mod
-  see a block-built gorilla instead (display entities), posed from head and hands, in the
-  Gorilla Tag colour, holding the held item. The player's normal model is hidden. In VR you see other gorillas in Minecraft's picture,
-  while your own hands stay Gorilla Tag's (no delay).
+  trigger, in fist mode): place blocks, open doors, press buttons, flip levers.
+- **Menus in VR:** Minecraft's own screens (title screen, worlds, servers, options, inventory,
+  chests, crafting) float in front of you. Point with the right hand, **trigger** clicks, **grip**
+  right-clicks, right stick scrolls, **B** closes. **Y** opens the inventory, the **menu**
+  button pauses, left stick click re-centres the panel.
+- **Hotbar** on your left wrist. **A**/**X** or left stick left/right change slots.
+- **Gorillas in multiplayer:** every GorillaCraft player is a gorilla. Players with the mod see
+  Gorilla Tag's real gorilla; players without it see a block-built gorilla (display entities) in
+  the Gorilla Tag colour, holding the held item. Player models are hidden.
 
   ![A gorilla in Minecraft](docs/gorilla-avatar.png)
-- **Multiplayer:** run a Fabric 26.3 server with GorillaCraft and Fabric API, and everyone joins
-  it from the menu. Gorillas on the same server share the world, and they line up in Gorilla Tag
-  too, because the map is anchored at the Minecraft world's spawn point.
+- **Multiplayer:** a Fabric 26.3 server with GorillaCraft and Fabric API; join it from
+  Minecraft's multiplayer screen like any server.
 
-**Windows players: follow the [step-by-step Windows guide](docs/WINDOWS-GUIDE.md).** Downloads are on the [releases page](https://github.com/easyax2/gorillacraft/releases).
+**Windows players: follow the [step-by-step Windows guide](docs/WINDOWS-GUIDE.md)** (it has a
+Linux section too). Downloads are on the [releases page](https://github.com/easyax2/gorillacraft/releases).
 
 ## Requirements
 
-- Gorilla Tag (Steam/PC VR) with **BepInEx 5**. Utilla is optional. GorillaCraft is active alone
-  (before joining a room), in private rooms and in Utilla's modded lobbies, and switches itself
-  off in public lobbies.
-- **Prism Launcher** with your Microsoft account (owning Minecraft: Java Edition). The plugin
-  carries the Minecraft mod and Fabric API: it creates a **GorillaCraft** instance (Minecraft
-  26.3 + Fabric) in Prism, starts it (on Windows), and Minecraft opens its world by itself.
+- A PC VR headset with an **OpenXR runtime** running: WiVRn (Quest on Linux), SteamVR, Oculus/Meta
+  Link, Virtual Desktop... Minecraft must use its **OpenGL** renderer (the default).
+- **Gorilla Tag** (Steam) with **BepInEx 5** and the GorillaCraft plugin.
+- **Prism Launcher** with your Microsoft account (owning Minecraft: Java Edition). Start Gorilla
+  Tag once with the plugin installed: it creates the **GorillaCraft** instance (Minecraft 26.3 +
+  Fabric + Fabric API + the mod) in Prism. After that you only start that instance.
 - On a Minecraft server, install `gorillacraft-fabric-<version>+26.3.jar` and Fabric API too.
-  Without it, the server may pull you back when you hug block edges.
 
 ## Playing
 
-1. Start Gorilla Tag. After a few seconds GorillaCraft sets up and starts Minecraft through
-   Prism (the first time, Prism downloads Minecraft). Minecraft opens a creative world called
-   GorillaCraft. It can sit in the background; it doesn't pause while Gorilla Tag is connected.
-   On Linux/Proton, start the instance yourself or with a Steam launch option (see the guide).
-2. You're dropped into the Minecraft world where your Minecraft player stands. Hold **B + Y**
-   for a second to leave the map or go back in. Play with others in a private room.
+1. Start your VR runtime (WiVRn, SteamVR...) and put the headset on.
+2. Start the **GorillaCraft** instance in Prism. Minecraft opens in the headset and starts
+   Gorilla Tag by itself a few seconds later (a small window: leave it running).
+3. Minecraft opens a creative world called GorillaCraft (or pick one from the menu). As soon as
+   Gorilla Tag is connected you're a gorilla: climb, punch, build.
 
-Tip: lower Minecraft's max framerate (or minimise it) so your VR game gets the GPU.
+**If your Gorilla Tag launch options start Prism** (`prismlauncher --launch GorillaCraft & ...`
+from older versions), **remove that part**: now Minecraft starts Gorilla Tag, not the other way.
+
+GorillaCraft only drives the gorilla when Gorilla Tag was started by Minecraft. Started normally,
+Gorilla Tag is plain Gorilla Tag (the plugin just keeps the Prism instance up to date).
 
 ## Configuration
+
+Minecraft: `config/gorillacraft.properties`
+
+| Setting | Default | |
+|---|---|---|
+| `vr` | `true` | Use the headset when an OpenXR runtime is there |
+| `vrResolution` | `1.0` | Eye resolution relative to the runtime's recommendation (0.3–2) |
+| `launchGorillaTag` | `true` | Start Gorilla Tag through Steam when Minecraft starts |
+| `port` | `47123` | Link port (must match Gorilla Tag's) |
+| `radius` / `verticalRadius` / `sectionsPerTick` | `4` / `4` / `6` | How much of the world becomes Gorilla Tag colliders |
 
 Gorilla Tag: `BepInEx/config/dev.gorillacraft.cfg`
 
@@ -87,38 +106,21 @@ Gorilla Tag: `BepInEx/config/dev.gorillacraft.cfg`
 | `Link.Host` / `Link.Port` | `127.0.0.1` / `47123` | Where Minecraft listens |
 | `Map.Anchor` | `0, 1500, 0` | Where Minecraft's spawn point sits in Gorilla Tag's world, far from Gorilla Tag's own maps |
 | `Map.BlockScale` | `1` | Size of a block in Gorilla Tag units (meters) |
-| `Map.AutoEnter` | `true` | Enter the map as soon as Minecraft is ready |
-| `Minecraft.AutoInstall` / `AutoLaunch` | `true` / `true` | Set up / start the GorillaCraft Prism instance |
-| `Minecraft.PrismPath` / `PrismDataDir` / `World` | | Where Prism is, and which world opens |
 | `Hands.TouchDistance` | `0.12` | How close a hand must be to a block to punch or use it |
-| `Hands.PunchSpeed` / `PunchHold` / `FistMode` | `2.0` / `0.4` / `false` | What counts as a punch, how long each punch mines, fist mode |
-| `Menu.OpenAtStart` / `Servers` | `true` / | Show the menu at start; servers joined from it |
-| `Performance.SectionsPerFrame` | `4` | Mesh/collider builds per frame |
-| `Rendering.PerEye` | `true` | Each eye gets its own Minecraft picture (Gorilla Tag switches to multi-pass rendering) |
-| `Rendering.Mode` | `Overlay` | `Overlay`: Minecraft's picture in 3D. `Blocks`: Gorilla Tag draws block meshes itself |
-| `Rendering.Shader` | `Universal Render Pipeline/Particles/Unlit` | Block shader (falls back to `Sprites/Default`) |
-
-Minecraft: `config/gorillacraft.properties` (`port`, `radius` in chunks, `verticalRadius` in
-sections, `sectionsPerTick`, and for the overlay `overlayWidth`, `overlayGrid`, `overlayFov`).
+| `Hands.PunchSpeed` / `PunchHold` / `FistMode` | `3.0` / `0.4` / `false` | What counts as a punch, how long each punch mines, fist mode |
+| `Minecraft.AutoInstall` / `PrismPath` / `PrismDataDir` / `World` | `true` | Keep the Prism instance set up, and where Prism is |
+| `Performance.SectionsPerFrame` | `4` | Collider builds per frame |
 
 ## Known limitations
 
-- **Not tested in a headset yet.** Both halves are tested together over the real link (see
-  below), but the Unity side (meshes, colliders, hands, wrist display) has only been compiled
-  against Gorilla Tag. Expect tuning: `BlockScale`, `TouchDistance` and the wrist panel position.
-- Container screens (chests, furnaces, crafting tables) can't be shown in Gorilla Tag yet. They
-  close straight away. Use the Minecraft window for your inventory.
-- Frames go from Minecraft to Gorilla Tag through shared memory, the way SkyCraft hands its
-  overlay to Skyrim (about 115 frames/s at 1920×1200 in testing; real worlds cost Minecraft more
-  to draw).
-- The overlay updates at Minecraft's frame rate, shared between the eyes (each eye gets every
-  other frame: raise Minecraft's Max Framerate to 60+ if you can). The 3D surface keeps head
-  turning smooth in between. Fast movement shows edges where Minecraft hasn't drawn
-  yet, and things right next to edges can look smeared until the next frame.
-- Mobs, players and gorillas get depth from their hitboxes, so they stand in front of the wall
-  behind them, but as boxes: an outstretched arm is drawn at the body's depth.
-- The overlay needs Minecraft's window open (not minimised), and its window size is the overlay's
-  resolution.
+- **Not tested while wearing a headset yet.** Minecraft's OpenXR session, both eye pictures and
+  the GUI panel are tested against WiVRn, and Gorilla Tag starts without VR and connects, but
+  playing with it on hasn't been tried. Expect tuning: hand offsets, panel and wrist positions.
+- Gorilla Tag must run for the gorilla to move. Without it you stand where the Minecraft player
+  is and can use the menus.
+- VR needs Minecraft's OpenGL renderer, not Vulkan.
+- Both eyes are drawn every frame: a heavy world costs twice what it does on a monitor. Lower
+  render distance or `vrResolution` if frames drop.
 - If you die in Minecraft (survival), you respawn straight away.
 
 ## Building
@@ -144,8 +146,12 @@ export GORILLACRAFT_TEST_DIR=/tmp/gorillacraft-test && rm -rf $GORILLACRAFT_TEST
 ```
 
 It checks the atlas, meshes, shapes, face winding and collision culling. It also enters the map,
-switches hotbar slots, mines, places, flips a lever and follows a `/tp`. The gametest then checks
-the results in the server's world.
+switches hotbar slots, mines, places, flips a lever, follows a `/tp`, then plays on a dedicated
+server (avatars included). The gametest then checks the results in the server's world.
+
+VR in a dev run: `GORILLACRAFT_VR=1 ./gradlew runVrClient` (opens a test world in the headset).
+`GORILLACRAFT_VR_FORCE_RENDER=1` draws the eyes without anyone wearing the headset, and
+`GORILLACRAFT_VR_DUMP=<frame>` saves both eyes and the GUI as PNGs on that frame.
 
 ## Layout
 

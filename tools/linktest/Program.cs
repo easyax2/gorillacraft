@@ -19,14 +19,6 @@ static class Program
     static Messages.Hotbar hotbar;
     static Messages.Teleport teleport;
     static byte[] atlas;
-    static Messages.Worlds worldsList;
-    static Messages.Frame frame;
-    static Messages.GuiFrame guiFrame;
-    static SharedFrames shared;
-    static int sharedFrames;
-    static Messages.Held held;
-    static readonly Messages.Frame[] eyeFrames = new Messages.Frame[3];
-    static int frames;
     static int sectionUpdates;
     static readonly List<string> statuses = new();
     static int failures;
@@ -38,7 +30,7 @@ static class Program
         Console.WriteLine($"linktest: waiting for {Path.Combine(dir, "ready")}");
         WaitFor(() => File.Exists(Path.Combine(dir, "ready")), 600, "world ready");
 
-        link = new LinkClient("127.0.0.1", port, s => Console.WriteLine("link: " + s), () => Proto.WantBlockMeshes | Proto.WantFrames | Proto.WantStereo | Proto.WantShm);
+        link = new LinkClient("127.0.0.1", port, s => Console.WriteLine("link: " + s), () => Proto.WantBlockMeshes);
         link.Start();
 
         WaitFor(() => world != null && world.HasWorld, 30, "WORLD");
@@ -63,14 +55,6 @@ static class Program
         int ack = teleport.Id;
         for (int i = 0; i < 10; i++) { SendPose(true, ack, 0.5, -58.3, 0.5); Pump(50); }
 
-        // Overlay: Minecraft draws each eye's view in turn and sends it back with depth.
-        WaitFor(() => eyeFrames[0] != null && eyeFrames[1] != null, 15, "FRAMEs for both eyes");
-        Check(Math.Abs(eyeFrames[0].CamX - 0.532) < 0.001 && Math.Abs(eyeFrames[1].CamX - 0.468) < 0.001, "left and right frames are drawn from each eye");
-        CheckFrame(eyeFrames[0]);
-        int framesBefore = frames;
-        for (int i = 0; i < 60; i++) { SendPose(true, ack, 0.5, -58.3, 0.5); Pump(50); }
-        Console.WriteLine($"overlay rate: {(frames - framesBefore) / 3.0:F0} frames/s ({eyeFrames[0].Width}x{eyeFrames[0].Height}, both eyes together)");
-
         // Hotbar.
         WaitFor(() => hotbar != null, 10, "HOTBAR");
         Console.WriteLine($"hotbar: selected {hotbar.Selected}, slot 1 '{hotbar.Names[0]}' x{hotbar.Counts[0]}, slot 2 '{hotbar.Names[1]}'");
@@ -79,23 +63,6 @@ static class Program
         WaitFor(() => hotbar.Selected == 1, 5, "slot 2 selected");
         link.Send(new FrameWriter(Proto.GtSlot).U8(0).Finish());
         WaitFor(() => hotbar.Selected == 0, 5, "slot 1 selected");
-
-        // Held item: planks come as a block texture.
-        WaitFor(() => held != null && held.Kind == 2, 5, "held item texture (planks)");
-        Check(held.Png != null && held.Png.Length > 8 && held.Png[1] == 'P', "held item comes with a PNG");
-
-        // Inventory panel: open it, move the pointer and click, close it.
-        link.Send(new FrameWriter(Proto.GtInventory).U8(1).Finish());
-        WaitFor(() => guiFrame != null && guiFrame.Width > 0, 10, "GUI frame for the inventory");
-        Console.WriteLine($"inventory panel: {guiFrame.Width}x{guiFrame.Height}");
-        Check(guiFrame.Rgba.Length == guiFrame.Width * guiFrame.Height * 4, "GUI frame has the picture");
-        link.Send(new FrameWriter(Proto.GtPointer).F32(0.5f).F32(0.5f).U8(1).Finish());
-        Pump(100);
-        link.Send(new FrameWriter(Proto.GtPointer).F32(0.5f).F32(0.5f).U8(0).Finish());
-        Pump(100);
-        link.Send(new FrameWriter(Proto.GtInventory).U8(0).Finish());
-        WaitFor(() => guiFrame.Width == 0, 10, "panel closed");
-        Console.WriteLine("inventory opened, clicked and closed");
 
         // Mine the stone (creative: one hit).
         int before = sectionUpdates;
@@ -134,9 +101,10 @@ static class Program
         // hands reaching forward (north) and out.
         for (int i = 0; i < 30; i++)
         {
-            link.Send(new FrameWriter(Proto.GtPose).U8(1).I32(teleport.Id).F64(10.5).F64(-58.3).F64(10.5).F32(180).F32(10)
-                .F64(10.5).F64(-58.0).F64(13.0).F64(10.5).F64(-58.0).F64(13.0)
-                .F64(11.0).F64(-58.7).F64(10.1).F64(9.8).F64(-58.2).F64(10.0).I32(0x3366CC).Finish());
+            var pose = new FrameWriter(Proto.GtPose).U8(1).I32(teleport.Id).F64(10.5).F64(-58.3).F64(10.5).F32(180).F32(10)
+                .F64(11.0).F64(-58.7).F64(10.1).F64(9.8).F64(-58.2).F64(10.0).I32(0x3366CC);
+            Rig(pose, 10.5, -60, 10.5);
+            link.Send(pose.Finish());
             if (testModel != null)
             {
                 // Rest pose, turned to face south (the camera), feet on the ground.
@@ -150,11 +118,10 @@ static class Program
 
         File.WriteAllText(Path.Combine(dir, "done"), "");
 
-        // Menu: join the dedicated server.
+        // Multiplayer: the gametest connects Minecraft to a dedicated server with the mod.
         WaitFor(() => File.Exists(Path.Combine(dir, "server-ready")), 120, "dedicated server");
         int tpBefore = teleport.Id;
-        link.Send(new FrameWriter(Proto.GtJoinServer).Str("127.0.0.1:34571").Finish());
-        WaitFor(() => world != null && world.HasWorld && world.Label == "127.0.0.1:34571", 60, "WORLD from the server");
+        WaitFor(() => world != null && world.HasWorld && world.Label != "" && File.Exists(Path.Combine(dir, "server-joined")), 60, "WORLD from the server");
         Console.WriteLine($"joined server: label {world.Label}, spawn {world.OriginX} {world.OriginY} {world.OriginZ}");
         WaitFor(() => teleport.Id > tpBefore, 15, "TELEPORT into the server world");
         for (int i = 0; i < 10; i++) { SendPose(true, teleport.Id, 3.5, -58.3, 1.5); Pump(50); }
@@ -166,24 +133,6 @@ static class Program
         Pump(500);
         File.WriteAllText(Path.Combine(dir, "done-server"), "");
 
-        // Menu: create a new singleplayer world by name, list the worlds, then leave.
-        WaitFor(() => File.Exists(Path.Combine(dir, "server-closed")), 60, "dedicated server closed");
-        Pump(1000);
-        link.Send(new FrameWriter(Proto.GtOpenWorld).Str("LinkTestWorld").Finish());
-        WaitFor(() => world != null && world.HasWorld && world.Label == "LinkTestWorld", 90, "new world LinkTestWorld");
-        Console.WriteLine("created and opened LinkTestWorld");
-        link.Send(new FrameWriter(Proto.GtLeaveWorld).Finish());
-        WaitFor(() => world != null && !world.HasWorld, 30, "left the world");
-        Console.WriteLine("left the world");
-        // The world that's open is locked and not listed, so list after leaving.
-        worldsList = null;
-        link.Send(new FrameWriter(Proto.GtListWorlds).Finish());
-        WaitFor(() => worldsList != null, 10, "WORLDS");
-        Console.WriteLine("worlds: " + string.Join(", ", worldsList.Names));
-        Check(Array.IndexOf(worldsList.Ids, "LinkTestWorld") >= 0, "world list has the new world");
-
-        Console.WriteLine($"{frames} overlay frames, {sharedFrames} of them through shared memory");
-        Check(shared != null && sharedFrames > 0, "frames come through shared memory");
         Console.WriteLine("statuses: " + string.Join(" | ", statuses));
         File.WriteAllText(Path.Combine(dir, "done-all"), "");
         Pump(500);
@@ -192,11 +141,21 @@ static class Program
         return failures == 0 ? 0 : 1;
     }
 
-    // Eyes 6.4 cm apart. Facing south (+Z), the left eye is towards +X.
-    static void SendPose(bool inMap, int ack, double x, double y, double z) =>
-        link.Send(new FrameWriter(Proto.GtPose).U8(inMap ? 1 : 0).I32(ack).F64(x).F64(y).F64(z).F32(0).F32(30)
-            .F64(x + 0.032).F64(y).F64(z).F64(x - 0.032).F64(y).F64(z)
-            .F64(x + 0.35).F64(y - 0.6).F64(z + 0.3).F64(x - 0.35).F64(y - 0.6).F64(z + 0.3).I32(0x3366CC).Finish());
+    static void SendPose(bool inMap, int ack, double x, double y, double z)
+    {
+        var w = new FrameWriter(Proto.GtPose).U8(inMap ? 1 : 0).I32(ack).F64(x).F64(y).F64(z).F32(0).F32(30)
+            .F64(x + 0.35).F64(y - 0.6).F64(z + 0.3).F64(x - 0.35).F64(y - 0.6).F64(z + 0.3).I32(0x3366CC);
+        Rig(w, x, y - 1.6, z);
+        link.Send(w.Finish());
+    }
+
+    /// <summary>A rig with no turning at 1:1 scale: tracking space's floor at the given point.</summary>
+    static void Rig(FrameWriter w, double x, double y, double z)
+    {
+        w.U8(1);
+        foreach (double v in new[] { 1, 0, 0, x, 0, 1, 0, y, 0, 0, 1, z })
+            w.F64(v);
+    }
 
     static void Use(int x, int y, int z, Proto.Face f, double hx, double hy, double hz) =>
         link.Send(new FrameWriter(Proto.GtUse).I32(x).I32(y).I32(z).U8((int)f).F64(hx).F64(hy).F64(hz).Finish());
@@ -220,52 +179,10 @@ static class Program
                     case Messages.Teleport t: teleport = t; break;
                     case Messages.Hotbar h: hotbar = h; break;
                     case Messages.Status st: statuses.Add(st.Text); break;
-                    case Messages.Worlds ws: worldsList = ws; break;
-                    case Messages.GuiFrame gf: guiFrame = gf; break;
-                    case Messages.Held hd: held = hd; break;
-                    case Messages.Shm shm:
-                        shared = SharedFrames.Open(shm.Path, shm.Size, s => Console.WriteLine("shm: " + s));
-                        Console.WriteLine($"shared frames {shm.Path}: {(shared != null ? "mapped" : "NOT mapped")}");
-                        link.Send(new FrameWriter(Proto.GtShm).U8(shared != null ? 1 : 0).Finish());
-                        break;
-                    case Messages.Frame fr: frame = fr; eyeFrames[Math.Clamp(fr.Eye, 0, 2)] = fr; frames++; break;
                 }
-            }
-            if (shared != null)
-            {
-                for (int b = 0; b < 3; b++)
-                    if (shared.TryTake(b, out var sl) && sl.Width > 0)
-                    {
-                        var fr = FromShared(sl);
-                        frame = fr;
-                        eyeFrames[Math.Clamp(fr.Eye, 0, 2)] = fr;
-                        frames++;
-                        sharedFrames++;
-                    }
-                if (shared.TryTake(SharedFrames.Gui, out var g))
-                    guiFrame = new Messages.GuiFrame { Width = g.Width, Height = g.Height, Rgba = g.Width > 0 ? TopDown(g) : null };
             }
             Thread.Sleep(5);
         } while (DateTime.UtcNow < until);
-    }
-
-    /// <summary>A shared-memory picture as a socket-style frame (rows top-down), for the same checks.</summary>
-    static Messages.Frame FromShared(SharedFrames.Slot s)
-    {
-        var f = new Messages.Frame { Id = (int)s.FrameId, Eye = s.Eye, CamX = s.CamX, CamY = s.CamY, CamZ = s.CamZ, Width = s.Width, Height = s.Height, GridW = s.GridW, GridH = s.GridH };
-        f.Rgba = TopDown(s);
-        f.Points = new float[s.GridW * s.GridH * 3];
-        System.Runtime.InteropServices.Marshal.Copy(s.Points, f.Points, 0, f.Points.Length);
-        return f;
-    }
-
-    static byte[] TopDown(SharedFrames.Slot s)
-    {
-        var rgba = new byte[s.Width * s.Height * 4];
-        int row = s.Width * 4;
-        for (int y = 0; y < s.Height; y++)
-            System.Runtime.InteropServices.Marshal.Copy(s.Pixels + (s.BottomUp ? s.Height - 1 - y : y) * row, rgba, y * row, row);
-        return rgba;
     }
 
     static void WaitFor(Func<bool> cond, int seconds, string what)
@@ -280,69 +197,6 @@ static class Program
             }
             Pump(20);
         }
-    }
-
-    /// <summary>
-    /// The gorilla looks horizontally-ish (pitch 30 down) over flat ground from 1.7 blocks up:
-    /// bottom of the picture is ground below the camera, top is sky far away.
-    /// </summary>
-    static void CheckFrame(Messages.Frame f)
-    {
-        Console.WriteLine($"frame {f.Id} (eye {f.Eye}): {f.Width}x{f.Height} picture, {f.GridW}x{f.GridH} depth grid, camera {f.CamX:F2} {f.CamY:F2} {f.CamZ:F2}");
-        Check(f.Width >= 64 && f.Height >= 64 && f.Rgba.Length == f.Width * f.Height * 4, "picture has a sane size");
-        Check(Math.Abs(f.CamX - 0.5) < 0.05 && Math.Abs(f.CamY - (-58.3)) < 0.01 && Math.Abs(f.CamZ - 0.5) < 0.01, "camera is at the gorilla's head");
-        int mid = f.GridW / 2;
-        float[] P(int gx, int gy) { int o = (gy * f.GridW + gx) * 3; return new[] { f.Points[o], f.Points[o + 1], f.Points[o + 2] }; }
-        var bottom = P(mid, f.GridH - 1);
-        var top = P(mid, 0);
-        double topDist = Math.Sqrt(top[0] * top[0] + top[1] * top[1] + top[2] * top[2]);
-        Console.WriteLine($"  bottom-centre point {bottom[0]:F2} {bottom[1]:F2} {bottom[2]:F2}, top-centre distance {topDist:F0}");
-        Check(Math.Abs(bottom[1] - (-1.7)) < 0.15, "bottom of the picture is the ground, 1.7 blocks below the eyes");
-        // Edge cutting (same test as OverlayView.Continuous): flat ground must stay whole; only the
-        // horizon (ground against sky) is an edge.
-        int groundCells = 0, groundCut = 0, skyEdge = 0;
-        for (int y = 0; y < f.GridH - 1; y++)
-            for (int x = 0; x < f.GridW - 1; x++)
-            {
-                int ia = y * f.GridW + x, ib = ia + 1, ic = ia + f.GridW, id = ic + 1;
-                var pa = P(ia % f.GridW, ia / f.GridW); var pb = P(ib % f.GridW, ib / f.GridW);
-                var pc = P(ic % f.GridW, ic / f.GridW); var pd = P(id % f.GridW, id / f.GridW);
-                bool anySky = new[] { pa, pb, pc, pd }.Any(q => Len(q) > 290);
-                bool allSky = new[] { pa, pb, pc, pd }.All(q => Len(q) > 290);
-                if (allSky) continue;
-                if (anySky) { skyEdge++; continue; }
-                groundCells++;
-                if (!Continuous(pa, pb, pc, pd)) groundCut++;
-            }
-        Console.WriteLine($"  edges: {groundCut} of {groundCells} ground cells cut, {skyEdge} horizon cells");
-        Check(groundCut <= groundCells / 100, "flat ground isn't cut (only real edges are)");
-        Check(top[1] > 0 && topDist > 250, "top of the picture is sky, far away");
-        // Yaw 0 looks south (+Z in Minecraft), so the ground in view is at +Z.
-        Check(bottom[2] > 0.05, "the view faces the way the gorilla looks (south)");
-        // Ground row: mostly grass green.
-        int gr = 0, n = 0;
-        for (int x = 0; x < f.Width; x += 8)
-        {
-            int o = ((f.Height - 4) * f.Width + x) * 4;
-            n++;
-            if (f.Rgba[o + 1] > f.Rgba[o] && f.Rgba[o + 1] > f.Rgba[o + 2]) gr++;
-        }
-        Check(gr > n / 2, $"bottom row of the picture is green grass ({gr}/{n})");
-    }
-
-    static double Len(float[] p) => Math.Sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]);
-
-    static bool Continuous(float[] a, float[] b, float[] c, float[] d)
-    {
-        double da = Len(a), db = Len(b), dc = Len(c), dd = Len(d);
-        double min = Math.Min(Math.Min(da, db), Math.Min(dc, dd)), max = Math.Max(Math.Max(da, db), Math.Max(dc, dd));
-        if (max <= min * 1.08 + 0.05) return true;
-        double[] u = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, v = { c[0] - a[0], c[1] - a[1], c[2] - a[2] };
-        double[] n = { u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0] };
-        double len = Math.Sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
-        if (len < 1e-8) return false;
-        double off = Math.Abs(((d[0] - a[0]) * n[0] + (d[1] - a[1]) * n[1] + (d[2] - a[2]) * n[2]) / len);
-        return off < 0.02 * min + 0.03;
     }
 
     static byte[] TestModel(string path)
@@ -367,7 +221,7 @@ static class Program
                 w.I32(idx.GetInt32());
             w.U8(p == 0 ? 1 : 0).F32(0.15f).F32(0.15f).F32(0.15f).F32(1).F32(1).F32(0).F32(0).I32(white.Length).Bytes(white);
         }
-        w.I32(1);
+        w.I32(1).I32(-1);
         return w.Finish();
     }
 

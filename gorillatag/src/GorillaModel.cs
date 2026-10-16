@@ -110,8 +110,22 @@ namespace GorillaCraft
                 w.I32(png.Length).Bytes(png);
             }
             w.I32(bones.Length);
-            log($"Exported Gorilla Tag's gorilla for Minecraft: {positions.Count} vertices, {submeshes.Count} parts, {bones.Length} bones");
+            int headBone = HeadBone(bones);
+            w.I32(headBone);
+            log($"Exported Gorilla Tag's gorilla for Minecraft: {positions.Count} vertices, {submeshes.Count} parts, {bones.Length} bones, head bone {(headBone >= 0 ? bones[headBone].name : "none")}");
             return w.Finish();
+        }
+
+        /// <summary>The head's bone (hidden for your own gorilla in VR: your eyes are in it).</summary>
+        private static int HeadBone(Transform[] bones)
+        {
+            for (int i = 0; i < bones.Length; i++)
+                if (bones[i] != null && bones[i].name.Equals("head", System.StringComparison.OrdinalIgnoreCase))
+                    return i;
+            for (int i = 0; i < bones.Length; i++)
+                if (bones[i] != null && bones[i].name.IndexOf("head", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    return i;
+            return -1;
         }
 
         private static int BoneOf(Transform t, Transform[] bones)

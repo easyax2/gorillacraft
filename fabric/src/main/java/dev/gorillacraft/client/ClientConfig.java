@@ -20,12 +20,12 @@ public final class ClientConfig {
 	public int verticalRadius = 4;
 	/** Sections meshed and sent per client tick at most. */
 	public int sectionsPerTick = 6;
-	/** Overlay mode: width the picture sent to Gorilla Tag is scaled down to (at most). */
-	public int overlayWidth = 2048;
-	/** Overlay mode: depth grid columns (rows follow the window's shape). */
-	public int overlayGrid = 160;
-	/** Overlay mode: vertical field of view Minecraft renders with, in degrees. */
-	public int overlayFov = 100;
+	/** Play in VR through OpenXR (WiVRn, SteamVR...) when a headset is there. */
+	public boolean vr = true;
+	/** Eye resolution, relative to what the headset's runtime recommends. */
+	public double vrResolution = 1.0;
+	/** Start Gorilla Tag (through Steam) when Minecraft starts and it isn't running yet. */
+	public boolean launchGorillaTag = true;
 
 	public static ClientConfig load() {
 		ClientConfig c = new ClientConfig();
@@ -46,15 +46,41 @@ public final class ClientConfig {
 		c.radius = Math.clamp(intProp(p, "radius", c.radius), 1, 16);
 		c.verticalRadius = Math.clamp(intProp(p, "verticalRadius", c.verticalRadius), 1, 24);
 		c.sectionsPerTick = Math.clamp(intProp(p, "sectionsPerTick", c.sectionsPerTick), 1, 64);
-		c.overlayWidth = Math.clamp(intProp(p, "overlayWidth", c.overlayWidth), 256, 4096);
-		c.overlayGrid = Math.clamp(intProp(p, "overlayGrid", c.overlayGrid), 16, 512);
-		c.overlayFov = Math.clamp(intProp(p, "overlayFov", c.overlayFov), 30, 150);
+		for (String old : new String[] {"overlayWidth", "overlayGrid", "overlayFov"}) {
+			p.remove(old);
+		}
+		c.vr = boolProp(p, "vr", c.vr);
+		c.vrResolution = Math.clamp(doubleProp(p, "vrResolution", c.vrResolution), 0.3, 2.0);
+		c.launchGorillaTag = boolProp(p, "launchGorillaTag", c.launchGorillaTag);
+		if (FabricLoader.getInstance().isDevelopmentEnvironment()) {
+			// Tests and dev runs: no headset session and no Gorilla Tag unless asked for.
+			c.vr = System.getenv("GORILLACRAFT_VR") != null;
+			c.launchGorillaTag = System.getenv("GORILLACRAFT_LAUNCH") != null;
+		}
 		try (Writer w = Files.newBufferedWriter(file)) {
 			p.store(w, "GorillaCraft (Minecraft side). port must match Port in Gorilla Tag's BepInEx/config/dev.gorillacraft.cfg");
 		} catch (IOException e) {
 			GorillaCraft.LOG.warn("Couldn't write {}", file, e);
 		}
 		return c;
+	}
+
+	private static boolean boolProp(Properties p, String key, boolean def) {
+		String v = p.getProperty(key, Boolean.toString(def)).trim();
+		boolean b = v.equalsIgnoreCase("true") || !v.equalsIgnoreCase("false") && def;
+		p.setProperty(key, Boolean.toString(b));
+		return b;
+	}
+
+	private static double doubleProp(Properties p, String key, double def) {
+		try {
+			double v = Double.parseDouble(p.getProperty(key, Double.toString(def)).trim());
+			p.setProperty(key, Double.toString(v));
+			return v;
+		} catch (NumberFormatException e) {
+			p.setProperty(key, Double.toString(def));
+			return def;
+		}
 	}
 
 	private static int intProp(Properties p, String key, int def) {

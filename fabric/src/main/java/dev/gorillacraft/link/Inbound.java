@@ -16,6 +16,11 @@ public final class Inbound {
 		this.buf = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN);
 	}
 
+	/** Bytes left to read (newer fields at the end of a message are optional). */
+	public int remaining() {
+		return buf.remaining();
+	}
+
 	public int u8() {
 		return buf.get() & 0xFF;
 	}

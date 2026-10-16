@@ -12,7 +12,6 @@
     <Compile Include="../../gorillatag/src/Wire.cs" />
     <Compile Include="../../gorillatag/src/LinkClient.cs" />
     <Compile Include="../../gorillatag/src/Messages.cs" />
-    <Compile Include="../../gorillatag/src/SharedFrames.cs" />
     <Compile Include="../../gorillatag/src/PrismSetup.cs" />
   </ItemGroup>
 </Project>

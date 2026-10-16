@@ -38,6 +38,8 @@ public final class GorillaMeshes {
 
 	private static final class Part {
 		int[] indices;
+		/** The same triangles without the head's: your own gorilla, seen from inside its head. */
+		int[] ownIndices;
 		boolean tinted;
 		float r, g, b;
 		float su, sv, ou, ov;
@@ -49,6 +51,7 @@ public final class GorillaMeshes {
 		float[] pos, nrm, uv, weight;
 		int[] bone;
 		int bones;
+		int headBone = -1;
 		List<Part> parts = new ArrayList<>();
 	}
 
@@ -121,8 +124,37 @@ public final class GorillaMeshes {
 			md.parts.add(part);
 		}
 		md.bones = m.i32();
+		md.headBone = m.remaining() >= 4 ? m.i32() : -1;
+		for (Part part : md.parts) {
+			part.ownIndices = withoutHead(md, part.indices);
+		}
 		model = md;
-		GorillaCraft.LOG.info("Gorilla Tag's gorilla model: {} vertices, {} parts, {} bones", n, parts, md.bones);
+		GorillaCraft.LOG.info("Gorilla Tag's gorilla model: {} vertices, {} parts, {} bones, head bone {}", n, parts, md.bones, md.headBone);
+	}
+
+	private static int[] withoutHead(Model md, int[] idx) {
+		if (md.headBone < 0) {
+			return idx;
+		}
+		int[] out = new int[idx.length];
+		int k = 0;
+		for (int i = 0; i + 2 < idx.length; i += 3) {
+			if (!onHead(md, idx[i]) && !onHead(md, idx[i + 1]) && !onHead(md, idx[i + 2])) {
+				out[k++] = idx[i];
+				out[k++] = idx[i + 1];
+				out[k++] = idx[i + 2];
+			}
+		}
+		return java.util.Arrays.copyOf(out, k);
+	}
+
+	private static boolean onHead(Model md, int v) {
+		for (int k = 0; k < 4; k++) {
+			if (md.bone[v * 4 + k] == md.headBone && md.weight[v * 4 + k] >= 0.3f) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** A gorilla's new bones (local from Gorilla Tag, or relayed by the server). */
@@ -149,7 +181,10 @@ public final class GorillaMeshes {
 		return model != null && p != null && System.nanoTime() - p.at < STALE_NANOS;
 	}
 
-	/** Fabric COLLECT_SUBMITS: draws every gorilla with a fresh pose (not your own, unless debugging). */
+	/**
+	 * Fabric COLLECT_SUBMITS: draws every gorilla with a fresh pose. Your own only in VR (without
+	 * its head, which you're inside), or when debugging.
+	 */
 	public static void render(LevelRenderContext context) {
 		Model md = model;
 		Minecraft mc = Minecraft.getInstance();
@@ -157,11 +192,15 @@ public final class GorillaMeshes {
 			return;
 		}
 		UUID me = mc.player != null ? mc.player.getUUID() : null;
-		boolean showOwn = System.getenv("GORILLACRAFT_SHOW_OWN_AVATAR") != null;
-		Vec3 cam = mc.gameRenderer.mainCamera().position();
+		var vr = dev.gorillacraft.client.vr.VrRenderer.get();
+		boolean inVr = vr != null && vr.active();
+		boolean showOwn = inVr || System.getenv("GORILLACRAFT_SHOW_OWN_AVATAR") != null;
+		// This pass's camera (in VR, the eye being drawn).
+		Vec3 cam = mc.gameRenderer.gameRenderState().levelRenderState.cameraRenderState.pos;
 		long now = System.nanoTime();
 		for (Map.Entry<UUID, Pose> e : POSES.entrySet()) {
-			if (e.getKey().equals(me) && !showOwn) {
+			boolean own = e.getKey().equals(me);
+			if (own && !showOwn) {
 				continue;
 			}
 			Pose p = e.getValue();
@@ -173,7 +212,8 @@ public final class GorillaMeshes {
 					continue;
 				}
 				// Interpolate between the last two poses, a pose-interval behind (smooth at ~20 updates/s).
-				float t = Math.clamp((float) (now - p.at) / Math.max(1, p.at - p.prevAt), 0f, 1f);
+				// Your own gorilla: the newest pose as it is (it's local, no network jitter to hide).
+				float t = own ? 1f : Math.clamp((float) (now - p.at) / Math.max(1, p.at - p.prevAt), 0f, 1f);
 				bones = lerp(p.prevBones, p.bones, t);
 				ref = p.prevRef.lerp(p.ref, t);
 				color = p.color;
@@ -187,7 +227,7 @@ public final class GorillaMeshes {
 			for (Part part : md.parts) {
 				int argb = part.tinted ? 0xFF000000 | color
 						: 0xFF000000 | (int) (part.r * 255) << 16 | (int) (part.g * 255) << 8 | (int) (part.b * 255);
-				int[] idx = part.indices;
+				int[] idx = own && inVr ? part.ownIndices : part.indices;
 				context.submitNodeCollector().submitCustomGeometry(ps, RenderTypes.entityCutout(part.texture), (pose, vc) -> {
 					// Triangles as quads with a repeated last corner (entity render types draw quads).
 					for (int i = 0; i + 2 < idx.length; i += 3) {

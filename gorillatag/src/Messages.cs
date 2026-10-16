@@ -17,11 +17,6 @@ namespace GorillaCraft
             public string Label;
         }
 
-        public sealed class Worlds
-        {
-            public string[] Ids;
-            public string[] Names;
-        }
 
         public sealed class Atlas { public byte[] Png; }
 
@@ -73,41 +68,21 @@ namespace GorillaCraft
 
         public sealed class Status { public string Text; }
 
-        /// <summary>One picture from Minecraft's camera, with its depth as a grid of 3D points.</summary>
-        public sealed class Frame
+        /// <summary>
+        /// The headset and controllers from Minecraft's OpenXR session: tracking space, OpenXR axes
+        /// (right-handed, -Z forward), metres. Poses are x y z, then quaternion x y z w. Hands are
+        /// already in SteamVR's controller pose (what Gorilla Tag is tuned for).
+        /// </summary>
+        public sealed class Tracking
         {
-            public int Id;
-            /// <summary>Proto.EyeLeft / EyeRight / EyeCenter.</summary>
-            public int Eye;
-            /// <summary>Camera position the frame was drawn from (Minecraft coordinates).</summary>
-            public double CamX, CamY, CamZ;
-            public int Width, Height;
-            /// <summary>RGBA, rows top to bottom.</summary>
-            public byte[] Rgba;
-            public int GridW, GridH;
-            /// <summary>xyz per grid point, relative to the camera (Minecraft axes), rows top to bottom.</summary>
-            public float[] Points;
-        }
-
-        /// <summary>Minecraft's whole window while a screen (inventory, chest...) is open; no size = closed.</summary>
-        public sealed class GuiFrame
-        {
-            public int Width, Height;
-            public byte[] Rgba;
-        }
-
-        /// <summary>The held item's texture (PNG). Kind 0 nothing, 1 item, 2 block.</summary>
-        public sealed class Held
-        {
-            public int Kind;
-            public byte[] Png;
-        }
-
-        /// <summary>Minecraft offers its frames through shared memory (SharedFrames).</summary>
-        public sealed class Shm
-        {
-            public string Path;
-            public long Size;
+            public int Flags;
+            public float[] Head = new float[7], Left = new float[7], Right = new float[7];
+            public float[] Trigger = new float[2], Grip = new float[2], StickX = new float[2], StickY = new float[2];
+            public int Buttons;
+            public bool LeftValid => (Flags & 2) != 0;
+            public bool RightValid => (Flags & 4) != 0;
+            public bool ScreenOpen => (Flags & 8) != 0;
+            public bool Button(int bit) => (Buttons & (1 << bit)) != 0;
         }
 
         public static readonly Box FullCube = new Box { MaxX = 1, MaxY = 1, MaxZ = 1 };
@@ -125,15 +100,6 @@ namespace GorillaCraft
                         OriginX = r.I32(), OriginY = r.I32(), OriginZ = r.I32(),
                         MinY = r.I32(), MaxY = r.I32(), Label = r.Str(),
                     };
-                case Proto.McWorlds:
-                    int n = r.I32();
-                    var ws = new Worlds { Ids = new string[n], Names = new string[n] };
-                    for (int i = 0; i < n; i++)
-                    {
-                        ws.Ids[i] = r.Str();
-                        ws.Names[i] = r.Str();
-                    }
-                    return ws;
                 case Proto.McAtlas:
                     return new Atlas { Png = r.Bytes(r.I32()) };
                 case Proto.McSection:
@@ -152,24 +118,20 @@ namespace GorillaCraft
                     return h;
                 case Proto.McStatus:
                     return new Status { Text = r.Str() };
-                case Proto.McShm:
-                    return new Shm { Path = r.Str(), Size = (long)r.F64() };
-                case Proto.McGuiFrame:
-                    var g = new GuiFrame { Width = r.I32(), Height = r.I32() };
-                    g.Rgba = g.Width > 0 ? r.Bytes(g.Width * g.Height * 4) : null;
-                    return g;
-                case Proto.McHeld:
-                    var held = new Held { Kind = r.U8() };
-                    int len = r.I32();
-                    held.Png = len > 0 ? r.Bytes(len) : null;
-                    return held;
-                case Proto.McFrame:
-                    var f = new Frame { Id = r.I32(), Eye = r.U8(), CamX = r.F64(), CamY = r.F64(), CamZ = r.F64(), Width = r.I32(), Height = r.I32() };
-                    f.Rgba = r.Bytes(f.Width * f.Height * 4);
-                    f.GridW = r.I32();
-                    f.GridH = r.I32();
-                    f.Points = r.Floats(f.GridW * f.GridH * 3);
-                    return f;
+                case Proto.McTracking:
+                    var t = new Tracking { Flags = r.U8() };
+                    for (int i = 0; i < 7; i++) t.Head[i] = r.F32();
+                    for (int i = 0; i < 7; i++) t.Left[i] = r.F32();
+                    for (int i = 0; i < 7; i++) t.Right[i] = r.F32();
+                    for (int hand = 0; hand < 2; hand++)
+                    {
+                        t.Trigger[hand] = r.F32();
+                        t.Grip[hand] = r.F32();
+                        t.StickX[hand] = r.F32();
+                        t.StickY[hand] = r.F32();
+                    }
+                    t.Buttons = r.U16();
+                    return t;
                 default:
                     return null;
             }
