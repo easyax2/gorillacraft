@@ -39,11 +39,11 @@ final class AutoWorld {
 		}
 	}
 
-	/** A new creative, peaceful world with cheats on. */
+	/** A new survival world on normal difficulty (mobs, hunger), with cheats on. */
 	static void create(Minecraft mc, String name, Screen parent) {
 		GorillaCraft.LOG.info("Creating world {} for Gorilla Tag", name);
-		LevelSettings settings = new LevelSettings(name, GameType.CREATIVE,
-				new LevelSettings.DifficultySettings(Difficulty.PEACEFUL, false, false), true, WorldDataConfiguration.DEFAULT);
+		LevelSettings settings = new LevelSettings(name, GameType.SURVIVAL,
+				new LevelSettings.DifficultySettings(Difficulty.NORMAL, false, false), true, WorldDataConfiguration.DEFAULT);
 		mc.createWorldOpenFlows().createFreshLevel(name, settings, WorldOptions.defaultWithRandomSeed(), WorldPresets::createNormalWorldDimensions, parent);
 	}
 }

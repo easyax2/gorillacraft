@@ -48,6 +48,10 @@ Tag.
 - **Room-scale breaking:** punch a block with your real hand (into it, faster than 3 m/s) and
   Minecraft mines it for a moment: creative breaks in one punch, survival takes several.
 - **Held item** in your right hand; other players hold theirs too.
+- **Survival:** moving costs a little hunger (measured from how far the gorilla travels, every
+  10 seconds: about 400 blocks per half drumstick). Hostile mobs see and attack gorillas.
+  Spears' charge attack is always on: run at a mob with a spear and it hits as hard as you're
+  moving. (Server-side: needs GorillaCraft on the server too.)
 - **Menus in VR:** Minecraft's own screens (title screen, worlds, servers, options, inventory,
   chests, crafting) float in front of you. Point with the right hand, **trigger** clicks, **grip**
   right-clicks, right stick scrolls, **B** closes. **Y** opens the inventory, the **menu**

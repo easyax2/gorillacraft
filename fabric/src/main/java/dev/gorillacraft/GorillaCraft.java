@@ -41,7 +41,9 @@ public class GorillaCraft implements ModInitializer {
 				}
 			}
 		});
+		net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(GorillaMotion::tick);
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+			GorillaMotion.forget(handler.player.getUUID());
 			GorillaPlayers.set(handler.player.getUUID(), false);
 			GorillaAvatars.remove(handler.player.getUUID());
 		});

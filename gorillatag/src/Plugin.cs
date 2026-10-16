@@ -24,7 +24,7 @@ namespace GorillaCraft
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.10.7";
+        public const string Version = "0.10.8";
 
         internal static ManualLogSource Log;
         private static Plugin instance;
