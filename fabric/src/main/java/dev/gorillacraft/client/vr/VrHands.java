@@ -7,6 +7,7 @@ import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.LightCoordsUtil;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.item.ItemDisplayContext;
@@ -17,7 +18,6 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import org.joml.Matrix3f;
 import org.joml.Quaternionf;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
@@ -38,13 +38,12 @@ import org.joml.Vector3f;
 public final class VrHands {
 	private static final ItemStackRenderState HELD = new ItemStackRenderState();
 	/**
-	 * Player-model hand frame → OpenXR grip frame: the model's arm (+Y) runs along the grip's
-	 * pointing direction (-Z), its front (-Z) is the controller's top (+Y), its +X is the hand's left.
+	 * Player-model hand frame → OpenXR grip frame. Grip: -Z runs through the fist from little
+	 * finger to thumb (forward, holding a controller), +X out of the back of the right hand, +Y up
+	 * along the forearm. Player model, arm hanging: +Y down the arm (grip -Y), -Z forward (grip -Z),
+	 * +X the player's left (grip -X). So a half turn about Z.
 	 */
-	private static final Quaternionf MODEL_TO_GRIP = new Quaternionf().setFromNormalized(new Matrix3f(
-			-1, 0, 0,
-			0, 0, -1,
-			0, -1, 0));
+	private static final Quaternionf MODEL_TO_GRIP = new Quaternionf().rotationZ((float) Math.PI);
 
 	/** Metres per second into a block that count as a punch, and how long each punch mines. */
 	private static final double PUNCH_SPEED = 3.0;
@@ -137,8 +136,29 @@ public final class VrHands {
 				}
 			}
 			wasInside[h] = inside;
+			// Mobs: the fist entering one fast enough hits it.
+			Entity hitMob = mobAt(mc, p);
+			if (hitMob != null && hitMob != lastMob[h] && lastHand[h] != null && dt > 0 && dt < 0.1) {
+				double speed = p.subtract(lastHand[h]).length() / dt / Math.max(1e-6, vr.worldScale());
+				if (speed >= PUNCH_SPEED && mc.gameMode != null) {
+					mc.gameMode.attack(mc.player, hitMob);
+					mc.player.swing(net.minecraft.world.InteractionHand.MAIN_HAND, mc.player.getMainHandItem().getAttackAnimation(), false);
+				}
+			}
+			lastMob[h] = hitMob;
 			lastHand[h] = p;
 		}
+	}
+
+	private static final Entity[] lastMob = new Entity[2];
+
+	private static Entity mobAt(Minecraft mc, Vec3 p) {
+		for (Entity e : mc.level.getEntities(mc.player, new AABB(p, p).inflate(0.05))) {
+			if (e.isPickable() && !e.isSpectator() && e.isAttackable() && e.getBoundingBox().inflate(0.05).contains(p)) {
+				return e;
+			}
+		}
+		return null;
 	}
 
 	private static boolean insideShape(Minecraft mc, BlockPos pos, Vec3 p) {
