@@ -40,6 +40,9 @@ final class GorillaTagLauncher {
 	}
 
 	static void launch() {
+		if (Util.getPlatform() == Util.OS.WINDOWS && launchExeDirectly()) {
+			return;
+		}
 		try {
 			List<String> cmd = new ArrayList<>();
 			if (Util.getPlatform() == Util.OS.WINDOWS) {
@@ -73,6 +76,61 @@ final class GorillaTagLauncher {
 		} catch (Exception e) {
 			GorillaCraft.LOG.error("Couldn't start Gorilla Tag; start it from Steam yourself", e);
 		}
+	}
+
+	/**
+	 * Windows: start Gorilla Tag.exe itself. Launched through Steam while SteamVR runs, Steam
+	 * hands SteamVR to the new game and SteamVR shuts Minecraft's VR session (and then Minecraft)
+	 * down; started directly, SteamVR never hears of it (Gorilla Tag runs without VR anyway).
+	 * steam_appid.txt next to the exe keeps Steamworks from relaunching it through Steam.
+	 */
+	private static boolean launchExeDirectly() {
+		try {
+			Path exe = findGameExe();
+			if (exe == null) {
+				GorillaCraft.LOG.warn("Gorilla Tag.exe not found in your Steam libraries; starting it through Steam");
+				return false;
+			}
+			Path appId = exe.resolveSibling("steam_appid.txt");
+			if (!Files.exists(appId)) {
+				Files.writeString(appId, APP_ID);
+			}
+			List<String> cmd = new ArrayList<>();
+			cmd.add(exe.toString());
+			cmd.addAll(List.of(GAME_ARGS));
+			new ProcessBuilder(cmd).directory(exe.getParent().toFile()).redirectOutput(ProcessBuilder.Redirect.DISCARD)
+					.redirectError(ProcessBuilder.Redirect.DISCARD).start();
+			GorillaCraft.LOG.info("Starting Gorilla Tag: {}", String.join(" ", cmd));
+			return true;
+		} catch (Exception e) {
+			GorillaCraft.LOG.warn("Couldn't start Gorilla Tag.exe directly ({}); starting it through Steam", e.toString());
+			return false;
+		}
+	}
+
+	/** Gorilla Tag.exe in whichever Steam library has it (libraryfolders.vdf lists them). */
+	private static Path findGameExe() {
+		String steamExe = windowsSteam();
+		List<Path> libraries = new ArrayList<>();
+		if (steamExe != null) {
+			Path steamDir = Path.of(steamExe).getParent();
+			libraries.add(steamDir);
+			Path vdf = steamDir.resolve("steamapps").resolve("libraryfolders.vdf");
+			try {
+				var m = java.util.regex.Pattern.compile("\"path\"\\s+\"([^\"]+)\"").matcher(Files.readString(vdf));
+				while (m.find()) {
+					libraries.add(Path.of(m.group(1).replace("\\\\", "\\")));
+				}
+			} catch (Exception ignored) {
+			}
+		}
+		for (Path lib : libraries) {
+			Path exe = lib.resolve("steamapps").resolve("common").resolve("Gorilla Tag").resolve("Gorilla Tag.exe");
+			if (Files.exists(exe)) {
+				return exe;
+			}
+		}
+		return null;
 	}
 
 	private static String windowsSteam() {
