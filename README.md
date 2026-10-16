@@ -42,11 +42,12 @@ Tag.
 - **Your gorilla:** Gorilla Tag's real gorilla model, read from your own installed Gorilla Tag at
   runtime (nothing from the game is shipped), posed with Gorilla Tag's bones. You see your own
   arms and body (not the head you're inside); everyone else sees the whole gorilla.
-- **Mining:** punch a block (hard, straight into it). Each punch keeps Minecraft mining it for a
-  moment, so creative breaks in one hit and survival takes as many punches as Minecraft's break
-  time. Optional fist mode: only punches with grip held count.
-- **Using:** press **grip** with a hand on a block to right-click it with your held item (the
-  trigger, in fist mode): place blocks, open doors, press buttons, flip levers.
+- **Breaking and placing:** point a controller at a block. **Left trigger** breaks (hold it,
+  like left click; hits mobs too), **right trigger** uses the held item (like right click:
+  place, open doors, eat, bows). Minecraft draws the block outline where you point.
+- **Room-scale breaking:** punch a block with your real hand (into it, faster than 3 m/s) and
+  Minecraft mines it for a moment: creative breaks in one punch, survival takes several.
+- **Held item** in your right hand; other players hold theirs too.
 - **Menus in VR:** Minecraft's own screens (title screen, worlds, servers, options, inventory,
   chests, crafting) float in front of you. Point with the right hand, **trigger** clicks, **grip**
   right-clicks, right stick scrolls, **B** closes. **Y** opens the inventory, the **menu**

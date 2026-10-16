@@ -25,6 +25,7 @@ public class GorillaCraftClient implements ClientModInitializer {
 		session = new GorillaSession(link, cfg);
 		VrRenderer.init(cfg);
 		ClientTickEvents.END_CLIENT_TICK.register(session::tick);
+		ClientTickEvents.END_CLIENT_TICK.register(dev.gorillacraft.client.vr.VrHands::tick);
 		if (cfg.launchGorillaTag) {
 			GorillaTagLauncher launcher = new GorillaTagLauncher();
 			ClientTickEvents.END_CLIENT_TICK.register(mc -> launcher.tick(mc, session, link.listening()));

@@ -24,7 +24,7 @@ namespace GorillaCraft
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.10.3";
+        public const string Version = "0.10.4";
 
         internal static ManualLogSource Log;
         private static Plugin instance;
@@ -91,7 +91,8 @@ namespace GorillaCraft
                 return;
             }
             MinecraftVr.Enable(new Harmony(Guid));
-            link = new LinkClient(host.Value, port.Value, s => Log.LogInfo(s), () => Proto.WantBlockMeshes);
+            // Colliders only: nothing here is drawn.
+            link = new LinkClient(host.Value, port.Value, s => Log.LogInfo(s), () => (byte)0);
             link.Start();
             var harmony = new Harmony(Guid + ".pose");
             harmony.Patch(AccessTools.Method(typeof(GTPlayer), "LateUpdate"), postfix: new HarmonyMethod(typeof(Plugin), nameof(AfterLocomotion)));
@@ -223,10 +224,9 @@ namespace GorillaCraft
             {
                 UpdateHold();
                 Messages.Tracking t = MinecraftVr.Tracking;
-                if (holding || t != null && t.ScreenOpen)
-                    hands.Stop(); // pointing at a Minecraft screen, not punching
-                else
-                    hands.Update();
+                // Punching, placing and the hotbar are Minecraft's now (VrHands): its triggers, and
+                // punches from your real hands.
+                hands.Stop();
             }
             if (!inMap && sentInMap)
                 SendPose(); // tell Minecraft we left

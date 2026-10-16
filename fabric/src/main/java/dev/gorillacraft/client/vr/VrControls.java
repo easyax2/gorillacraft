@@ -36,7 +36,7 @@ public final class VrControls {
 	private boolean wasScreen;
 
 	// Last frame's buttons, for presses.
-	private boolean prevSecondaryL, prevSecondaryR, prevMenu, prevStickClickL;
+	private boolean prevSecondaryL, prevSecondaryR, prevMenu, prevStickClickL, prevPrimaryL, prevPrimaryR;
 	private float prevStickXL;
 
 	VrControls(VrRenderer vr, XrRuntime xr) {
@@ -86,6 +86,12 @@ public final class VrControls {
 			}
 		}
 		if (!screen && mc.player != null) {
+			// A / X: next / previous hotbar slot.
+			int step = (pressed(in.primary_[1], prevPrimaryR) ? 1 : 0) - (pressed(in.primary_[0], prevPrimaryL) ? 1 : 0);
+			if (step != 0) {
+				Inventory inv = mc.player.getInventory();
+				inv.setSelectedSlot(Math.floorMod(inv.getSelectedSlot() + step, Inventory.getSelectionSize()));
+			}
 			float x = in.stickX[0];
 			if (Math.abs(x) > 0.7f && Math.abs(prevStickXL) <= 0.7f) {
 				Inventory inv = mc.player.getInventory();
@@ -94,6 +100,8 @@ public final class VrControls {
 			}
 		}
 		VrHands.update(mc, in, screen);
+		prevPrimaryL = in.primary_[0];
+		prevPrimaryR = in.primary_[1];
 		prevSecondaryL = in.secondary_[0];
 		prevSecondaryR = in.secondary_[1];
 		prevMenu = in.menu_;

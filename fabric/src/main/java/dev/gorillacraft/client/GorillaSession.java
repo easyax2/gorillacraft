@@ -377,6 +377,10 @@ public final class GorillaSession {
 		if (gameMode == null) {
 			return;
 		}
+		if (dev.gorillacraft.client.vr.VrHands.mining()) {
+			mining = false; // the VR hands are mining; Gorilla Tag's punches wait
+			return;
+		}
 		if (mineTarget != null && driving()) {
 			// Same calls as holding the attack button: start once, then continue every tick.
 			// continueDestroyBlock handles creative's break delay and switching to a new block.

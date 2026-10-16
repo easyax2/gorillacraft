@@ -38,8 +38,10 @@ abstract class EntityRenderDispatcherMixin {
 					var me = Minecraft.getInstance().player;
 					boolean mine = me != null && me.getUUID().equals(owner);
 					if (mine && System.getenv("GORILLACRAFT_SHOW_OWN_AVATAR") == null
-							|| dev.gorillacraft.client.GorillaMeshes.drawsReal(owner)) {
-						cir.setReturnValue(false); // yours, or drawn here as the real Gorilla Tag gorilla
+							|| dev.gorillacraft.client.GorillaMeshes.drawsReal(owner) && !(entity instanceof Display.ItemDisplay)) {
+						// Yours (VR draws your held item itself), or drawn here as the real Gorilla Tag
+						// gorilla, which keeps the avatar's held item in its hand.
+						cir.setReturnValue(false);
 					}
 				} catch (IllegalArgumentException ignored) {
 				}

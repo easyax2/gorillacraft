@@ -4,7 +4,7 @@ This guide takes you from a plain Gorilla Tag and Minecraft install to playing M
 as a Gorilla Tag gorilla. Each step says how to check that it worked before you move on. Linux
 players: follow the same steps, then read [section 14](#14-linux-proton-and-wivrn).
 
-> **Early release.** GorillaCraft 0.10.3 changes how everything works (Minecraft is now the VR
+> **Early release.** GorillaCraft 0.10.4 changes how everything works (Minecraft is now the VR
 > game). It has been tested against a real headset runtime and with a stand-in for Gorilla Tag,
 > but not yet played with the headset on. Hand positions, the menu panel and the wrist hotbar
 > may need tuning. Please report what you find.
@@ -55,7 +55,7 @@ headset on. Minecraft opens in the headset and starts Gorilla Tag by itself.
 | **Minecraft: Java Edition** | Owned on your Microsoft account. GorillaCraft uses version 26.3, and Prism downloads it for you. |
 | **[Prism Launcher](https://prismlauncher.org/download/windows/)** | Free Minecraft launcher. GorillaCraft sets up its own instance in it. |
 | **A reasonably strong PC** | Minecraft draws two eyes at headset resolution while Gorilla Tag runs alongside. Plan for 16 GB of RAM and a GPU that runs VR games comfortably. |
-| **From the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)** | `GorillaCraft.dll`, or `GorillaCraft-0.10.3-GorillaTag.zip` with the same dll already in its folders. The Minecraft mod is inside the dll; the separate `.jar` is for servers and manual installs. |
+| **From the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)** | `GorillaCraft.dll`, or `GorillaCraft-0.10.4-GorillaTag.zip` with the same dll already in its folders. The Minecraft mod is inside the dll; the separate `.jar` is for servers and manual installs. |
 
 **Utilla isn't needed.** GorillaCraft works alone (Gorilla Tag stays out of rooms while you play),
 in private rooms, and in modded lobbies. It switches itself off in public lobbies.
@@ -115,15 +115,15 @@ You don't need to create an instance or download any mods. GorillaCraft does tha
 **Check:** open `BepInEx\LogOutput.log` in Notepad. You should see:
 
 ```
-[Info   :   BepInEx] Loading [GorillaCraft 0.10.3]
+[Info   :   BepInEx] Loading [GorillaCraft 0.10.4]
 [Info   :GorillaCraft] Gorilla Tag started normally: GorillaCraft stays out of the way. ...
-[Info   :GorillaCraft] Prism instance in C:\Users\...\AppData\Roaming\PrismLauncher: created instance; ...; installed gorillacraft-fabric-0.10.3+26.3.jar; installed fabric-api-0.161.0+26.3.jar
+[Info   :GorillaCraft] Prism instance in C:\Users\...\AppData\Roaming\PrismLauncher: created instance; ...; installed gorillacraft-fabric-0.10.4+26.3.jar; installed fabric-api-0.161.0+26.3.jar
 ```
 
 Prism now has an instance called **GorillaCraft**: Minecraft 26.3, Fabric Loader 0.19.5, Fabric
 API and the GorillaCraft mod, set to open a creative world called **GorillaCraft** by itself.
 
-**If you used GorillaCraft before 0.10.3:** remove `prismlauncher --launch GorillaCraft &` from
+**If you used GorillaCraft before 0.10.4:** remove `prismlauncher --launch GorillaCraft &` from
 Gorilla Tag's Steam launch options (**Gorilla Tag → Properties → General → Launch Options**).
 Minecraft starts Gorilla Tag now, not the other way round.
 
@@ -156,11 +156,15 @@ on and you're in VR again.
 |---|---|
 | **Move your arms** | Gorilla Tag locomotion: push off blocks to move, climb, jump. |
 | **Right stick** left/right | Snap turn (Gorilla Tag's). |
-| **Punch** a block (hard, straight into it) | Mine it. Each punch keeps Minecraft mining for a moment (0.4 s by default): creative breaks with one punch, survival takes as many punches as the block needs. Tools and drops are Minecraft's. |
-| Point the right controller at a block, pull the **trigger** | Right-click it with the held item (Minecraft shows the outline): place a block, open a door, press a button, eat, draw a bow... |
+| Point the **left** controller at a block, hold the **left trigger** | Break it (like holding left click). Tools and drops are Minecraft's. Pointing at a mob and pulling hits it. |
+| Point the **right** controller at a block, pull the **right trigger** | Use it with the held item (like right click): place a block, open a door, press a button, eat, draw a bow... |
+| **Punch** a block with your real hand (hard, straight into it) | Mine it: each punch keeps Minecraft mining for 0.4 s, so creative breaks in one punch and survival takes several. |
 | **A** / **X**, or **left stick** left/right | Next / previous hotbar slot. The hotbar is on your left wrist. |
 | **Y** | Open / close the inventory. |
 | **Menu** button (left controller) | Pause menu (Options, Save and Quit...). |
+
+Minecraft outlines the block the controller you're using points at. Your held item is in your
+right hand.
 
 **Menus** (title screen, worlds, servers, options, inventory, chests, crafting tables) float about
 a metre in front of you:
@@ -177,10 +181,9 @@ a metre in front of you:
 While a menu is open your hands don't punch or place. For typing (world names, server
 addresses, chat) use your real keyboard: click into the Minecraft window first.
 
-- A punch is your hand **arriving** at a block moving **into it** faster than 3 m/s (`PunchSpeed`).
-  Resting a hand on a block or climbing doesn't break it. If climbing breaks blocks in creative,
-  raise `PunchSpeed` or turn on `FistMode` (then only punches with grip held count, and the
-  trigger places instead of the grip).
+- A punch is your real hand **entering** a block faster than 3 m/s. Your gorilla's hands stop at
+  the surface when you climb, but your real hands go a little further in, so slow climbing
+  never breaks blocks; fast slaps can, in creative.
 - You can touch blocks you can walk through (torches, flowers, buttons, levers), but not climb on them.
 - In a new creative world your hotbar starts empty: open the inventory (**Y**) and drag blocks
   into it.
@@ -244,7 +247,7 @@ You need [Java 25](https://adoptium.net/) on the server PC.
 4. Open `eula.txt`, change `eula=false` to `eula=true`, save.
 5. Put **two jars** into the new `mods` folder:
    - **Fabric API** for 26.3, from [Modrinth](https://modrinth.com/mod/fabric-api)
-   - `gorillacraft-fabric-0.10.3+26.3.jar` from the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)
+   - `gorillacraft-fabric-0.10.4+26.3.jar` from the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)
 6. Optional, in `server.properties`:
    - `gamemode=creative` (and `force-gamemode=true`) for building, or leave survival
    - `difficulty=peaceful` if you don't want mobs attacking gorillas

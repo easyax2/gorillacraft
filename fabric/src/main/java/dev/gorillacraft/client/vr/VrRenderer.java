@@ -89,6 +89,13 @@ public final class VrRenderer {
 		return xr.frameBegun();
 	}
 
+	private int eyeIndex;
+
+	/** True while the right eye is drawn (after the left, which did the shared work). */
+	public boolean secondEye() {
+		return pass == Pass.EYE && eyeIndex == 1;
+	}
+
 	/** True during the eye passes (no GUI, no first-person hand). */
 	public boolean eyePass() {
 		return pass == Pass.EYE;
@@ -290,6 +297,7 @@ public final class VrRenderer {
 		try {
 			boolean zZeroToOne = RenderSystem.getDevice().getDeviceInfo().isZZeroToOne();
 			for (int e = 0; e < 2; e++) {
+				eyeIndex = e;
 				XrRuntime.View v = xr.view(e);
 				Vector3d p = toWorld(v.pos, new Vector3d());
 				cam.pos = new Vec3(p.x, p.y, p.z);
