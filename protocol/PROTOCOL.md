@@ -1,4 +1,4 @@
-# GorillaCraft link protocol (version 6)
+# GorillaCraft link protocol (version 7)
 
 Loopback TCP. Minecraft listens on `127.0.0.1:47123` (configurable), Gorilla Tag connects and
 reconnects as needed. One Gorilla Tag at a time; a new connection replaces the old one.
@@ -20,7 +20,7 @@ Faces use Minecraft's `Direction` 3D data value: 0 down, 1 up, 2 north, 3 south,
 | Type | Name | Payload |
 |---|---|---|
 | 0x01 | HELLO | `i32 protocolVersion, str pluginVersion, u8 wants` — bit 1: block meshes (and the atlas), bit 2: overlay frames, bit 4: per-eye frames (alternating left/right), bit 8: frames through shared memory. Collision and shapes are always sent. |
-| 0x02 | POSE | `u8 inMap, i32 teleportAck, f64 x, f64 y, f64 z (eyes), f32 yaw, f32 pitch, f64 leftEye xyz, f64 rightEye xyz` — ~50 Hz while in the map, and on every inMap change |
+| 0x02 | POSE | `u8 inMap, i32 teleportAck, f64 x, f64 y, f64 z (eyes), f32 yaw, f32 pitch, f64 leftEye xyz, f64 rightEye xyz, f64 leftHand xyz, f64 rightHand xyz, u32 color (0xRRGGBB)` — ~50 Hz while in the map, and on every inMap change |
 | 0x03 | MINE | `u8 active, i32 x, i32 y, i32 z, u8 face` — sent when the mined block/face changes or mining stops |
 | 0x04 | USE | `i32 x, i32 y, i32 z, u8 face, f64 hitX, f64 hitY, f64 hitZ` — one right-click on that block |
 | 0x05 | SLOT | `u8 slot (0-8)` |

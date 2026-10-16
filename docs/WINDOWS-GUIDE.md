@@ -340,6 +340,13 @@ back when they hug block edges. The server doesn't need Gorilla Tag.
    as gorillas. Or join the same modded lobby if you all have Utilla.
 
 The server remembers each player's Minecraft position, so you come back where you left off.
+**Everyone is a gorilla:** in the Minecraft world, every GorillaCraft player shows up as a
+gorilla in their Gorilla Tag colour, with arms reaching to where their real hands are, holding
+their held item. Players without GorillaCraft on the same server see the gorillas too (they're
+made of Minecraft's own display entities). In VR you see the other gorillas through Minecraft's
+picture; your own hands are still drawn by Gorilla Tag so they don't lag. Other players'
+Gorilla Tag gorillas are hidden while you're in the map, since Minecraft draws them.
+
 Everyone needs the same `Anchor` and `BlockScale` settings (the defaults are fine) so the gorillas
 line up on the same blocks.
 
