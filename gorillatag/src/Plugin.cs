@@ -24,7 +24,7 @@ namespace GorillaCraft
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.10.1";
+        public const string Version = "0.10.2";
 
         internal static ManualLogSource Log;
         private static Plugin instance;
@@ -206,7 +206,7 @@ namespace GorillaCraft
             if (Time.unscaledTime >= nextDiagnostics)
             {
                 nextDiagnostics = Time.unscaledTime + 5f;
-                Log.LogInfo($"Gorilla: {MinecraftVr.Diagnostics()}, inMap {inMap} holding {holding}");
+                Log.LogInfo($"Gorilla: {Mathf.RoundToInt(1f / Mathf.Max(0.0001f, Time.smoothDeltaTime))} fps, {MinecraftVr.Diagnostics()}, inMap {inMap} holding {holding}");
             }
 
             bool allowed = ModsAllowedHere();

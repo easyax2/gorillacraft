@@ -94,6 +94,17 @@ public final class VrRenderer {
 		return pass == Pass.EYE;
 	}
 
+	private final Vector3f eyeOffset = new Vector3f();
+
+	/** During an eye pass: the extraction camera (head middle) minus this eye, world axes. */
+	public Vector3f eyeOffset() {
+		return eyeOffset;
+	}
+
+	// Frame timing, logged every 10 seconds.
+	private long statsStart = System.nanoTime(), waitNanos, renderNanos;
+	private int statsFrames;
+
 	public VrControls controls() {
 		return controls;
 	}
@@ -125,7 +136,9 @@ public final class VrRenderer {
 		if (!openGl) {
 			return;
 		}
+		long t0 = System.nanoTime();
 		xr.beginFrame();
+		waitNanos += System.nanoTime() - t0;
 		// The headset sets the pace: vsync to the monitor would hold every frame back.
 		if (xr.sessionRunning()) {
 			mc.options.pauseOnLostFocus = false; // you're in the headset, not at the window
@@ -210,6 +223,27 @@ public final class VrRenderer {
 	 * everything to the runtime.
 	 */
 	public void render(Minecraft mc, GameRenderer gameRenderer) {
+		long t0 = System.nanoTime();
+		try {
+			renderFrame(mc, gameRenderer);
+		} finally {
+			renderNanos += System.nanoTime() - t0;
+			statsFrames++;
+			long now = System.nanoTime();
+			if (now - statsStart > 10_000_000_000L) {
+				double s = (now - statsStart) / 1e9;
+				var session = dev.gorillacraft.client.GorillaCraftClient.session();
+				GorillaCraft.LOG.info("VR: {} fps, drawing {} ms/frame, waiting for the headset {} ms/frame, Gorilla Tag {} poses/s",
+						Math.round(statsFrames / s), String.format("%.1f", renderNanos / 1e6 / statsFrames),
+						String.format("%.1f", waitNanos / 1e6 / statsFrames), session != null ? Math.round(session.takePoseCount() / s) : 0);
+				statsStart = now;
+				statsFrames = 0;
+				waitNanos = renderNanos = 0;
+			}
+		}
+	}
+
+	private void renderFrame(Minecraft mc, GameRenderer gameRenderer) {
 		GameRenderState state = gameRenderer.gameRenderState();
 		state.framerateLimit = 260; // the runtime paces frames (xrWaitFrame), not Minecraft's limiter
 		if (!xr.shouldRender()) {
@@ -259,6 +293,7 @@ public final class VrRenderer {
 				XrRuntime.View v = xr.view(e);
 				Vector3d p = toWorld(v.pos, new Vector3d());
 				cam.pos = new Vec3(p.x, p.y, p.z);
+				eyeOffset.set((float) (headPos.x - p.x), (float) (headPos.y - p.y), (float) (headPos.z - p.z));
 				toWorld(v.rot, cam.orientation);
 				cam.viewRotationMatrix.rotation(new Quaternionf(cam.orientation).conjugate());
 				// Reversed depth like Minecraft's own projection: near and far swapped.

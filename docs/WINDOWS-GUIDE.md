@@ -4,7 +4,7 @@ This guide takes you from a plain Gorilla Tag and Minecraft install to playing M
 as a Gorilla Tag gorilla. Each step says how to check that it worked before you move on. Linux
 players: follow the same steps, then read [section 14](#14-linux-proton-and-wivrn).
 
-> **Early release.** GorillaCraft 0.10.1 changes how everything works (Minecraft is now the VR
+> **Early release.** GorillaCraft 0.10.2 changes how everything works (Minecraft is now the VR
 > game). It has been tested against a real headset runtime and with a stand-in for Gorilla Tag,
 > but not yet played with the headset on. Hand positions, the menu panel and the wrist hotbar
 > may need tuning. Please report what you find.
@@ -55,7 +55,7 @@ headset on. Minecraft opens in the headset and starts Gorilla Tag by itself.
 | **Minecraft: Java Edition** | Owned on your Microsoft account. GorillaCraft uses version 26.3, and Prism downloads it for you. |
 | **[Prism Launcher](https://prismlauncher.org/download/windows/)** | Free Minecraft launcher. GorillaCraft sets up its own instance in it. |
 | **A reasonably strong PC** | Minecraft draws two eyes at headset resolution while Gorilla Tag runs alongside. Plan for 16 GB of RAM and a GPU that runs VR games comfortably. |
-| **From the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)** | `GorillaCraft.dll`, or `GorillaCraft-0.10.1-GorillaTag.zip` with the same dll already in its folders. The Minecraft mod is inside the dll; the separate `.jar` is for servers and manual installs. |
+| **From the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)** | `GorillaCraft.dll`, or `GorillaCraft-0.10.2-GorillaTag.zip` with the same dll already in its folders. The Minecraft mod is inside the dll; the separate `.jar` is for servers and manual installs. |
 
 **Utilla isn't needed.** GorillaCraft works alone (Gorilla Tag stays out of rooms while you play),
 in private rooms, and in modded lobbies. It switches itself off in public lobbies.
@@ -115,15 +115,15 @@ You don't need to create an instance or download any mods. GorillaCraft does tha
 **Check:** open `BepInEx\LogOutput.log` in Notepad. You should see:
 
 ```
-[Info   :   BepInEx] Loading [GorillaCraft 0.10.1]
+[Info   :   BepInEx] Loading [GorillaCraft 0.10.2]
 [Info   :GorillaCraft] Gorilla Tag started normally: GorillaCraft stays out of the way. ...
-[Info   :GorillaCraft] Prism instance in C:\Users\...\AppData\Roaming\PrismLauncher: created instance; ...; installed gorillacraft-fabric-0.10.1+26.3.jar; installed fabric-api-0.161.0+26.3.jar
+[Info   :GorillaCraft] Prism instance in C:\Users\...\AppData\Roaming\PrismLauncher: created instance; ...; installed gorillacraft-fabric-0.10.2+26.3.jar; installed fabric-api-0.161.0+26.3.jar
 ```
 
 Prism now has an instance called **GorillaCraft**: Minecraft 26.3, Fabric Loader 0.19.5, Fabric
 API and the GorillaCraft mod, set to open a creative world called **GorillaCraft** by itself.
 
-**If you used GorillaCraft before 0.10.1:** remove `prismlauncher --launch GorillaCraft &` from
+**If you used GorillaCraft before 0.10.2:** remove `prismlauncher --launch GorillaCraft &` from
 Gorilla Tag's Steam launch options (**Gorilla Tag → Properties → General → Launch Options**).
 Minecraft starts Gorilla Tag now, not the other way round.
 
@@ -244,7 +244,7 @@ You need [Java 25](https://adoptium.net/) on the server PC.
 4. Open `eula.txt`, change `eula=false` to `eula=true`, save.
 5. Put **two jars** into the new `mods` folder:
    - **Fabric API** for 26.3, from [Modrinth](https://modrinth.com/mod/fabric-api)
-   - `gorillacraft-fabric-0.10.1+26.3.jar` from the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)
+   - `gorillacraft-fabric-0.10.2+26.3.jar` from the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)
 6. Optional, in `server.properties`:
    - `gamemode=creative` (and `force-gamemode=true`) for building, or leave survival
    - `difficulty=peaceful` if you don't want mobs attacking gorillas

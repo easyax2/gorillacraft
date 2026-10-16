@@ -73,6 +73,15 @@ public final class GorillaSession {
 		this.cfg = cfg;
 	}
 
+	private int poseCount;
+
+	/** Poses received since the last call (for the VR frame-rate log). */
+	public int takePoseCount() {
+		int n = poseCount;
+		poseCount = 0;
+		return n;
+	}
+
 	public boolean connected() {
 		return connection != 0;
 	}
@@ -183,6 +192,7 @@ public final class GorillaSession {
 				}
 			}
 			case Proto.GT_POSE -> {
+				poseCount++;
 				boolean nowInMap = m.u8() != 0;
 				poseAck = m.i32();
 				poseX = m.f64();
