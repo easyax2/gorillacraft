@@ -1,4 +1,4 @@
-# GorillaCraft link protocol (version 7)
+# GorillaCraft link protocol (version 8)
 
 Loopback TCP. Minecraft listens on `127.0.0.1:47123` (configurable), Gorilla Tag connects and
 reconnects as needed. One Gorilla Tag at a time; a new connection replaces the old one.
@@ -31,6 +31,8 @@ Faces use Minecraft's `Direction` 3D data value: 0 down, 1 up, 2 north, 3 south,
 | 0x0A | INVENTORY | `u8 open` — open the inventory, or (0) close whatever screen is open |
 | 0x0B | POINTER | `f32 u, f32 v (0..1 across Minecraft's window, from the top left), u8 buttons (bit 0 left, bit 1 right)` |
 | 0x0C | SCROLL | `f32 amount` |
+| 0x0E | MODEL | Gorilla Tag's gorilla, read from the running game (sent once): `i32 n`, n × (`f32 pos xyz, normal xyz, uv`, `u8 bones[4]`, `f32 weights[4]`), `i32 parts`, parts × (`i32 count, i32 indices[count], u8 tinted, f32 rgb, f32 uv scale/offset[4], i32 len, PNG`), `i32 boneCount` |
+| 0x0F | BONES | `f64 ref xyz, i32 n`, n × 12 `f32`: per bone, the 3x4 matrix from mesh space to Minecraft coordinates relative to ref (Gorilla Tag's live pose) |
 | 0x0D | SHM | `u8 ok` — whether Gorilla Tag could map the shared frame memory offered with MC SHM |
 
 ## Minecraft → Gorilla Tag

@@ -8,9 +8,10 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Client → server, every tick while Gorilla Tag drives the player: where the gorilla's head and
- * hands are and what colour it is, so the server can show everyone a gorilla (GorillaAvatars).
+ * hands are and what colour it is, so the server can show everyone a gorilla (GorillaAvatars), plus
+ * Gorilla Tag's bone pose (empty if none) for clients that draw the real model.
  */
-public record GorillaPosePayload(Vec3 head, float yaw, float pitch, Vec3 leftHand, Vec3 rightHand, int color) implements CustomPacketPayload {
+public record GorillaPosePayload(Vec3 head, float yaw, float pitch, Vec3 leftHand, Vec3 rightHand, int color, float[] bones) implements CustomPacketPayload {
 	public static final Type<GorillaPosePayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(GorillaCraft.MOD_ID, "pose"));
 	public static final StreamCodec<RegistryFriendlyByteBuf, GorillaPosePayload> CODEC = StreamCodec.of(
 			(buf, p) -> {
@@ -19,10 +20,11 @@ public record GorillaPosePayload(Vec3 head, float yaw, float pitch, Vec3 leftHan
 				buf.writeDouble(p.leftHand.x).writeDouble(p.leftHand.y).writeDouble(p.leftHand.z);
 				buf.writeDouble(p.rightHand.x).writeDouble(p.rightHand.y).writeDouble(p.rightHand.z);
 				buf.writeInt(p.color);
+				GorillaBonesPayload.writeFloats(buf, p.bones);
 			},
 			buf -> new GorillaPosePayload(new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble()), buf.readFloat(), buf.readFloat(),
 					new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble()), new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble()),
-					buf.readInt()));
+					buf.readInt(), GorillaBonesPayload.readFloats(buf)));
 
 	@Override
 	public Type<? extends CustomPacketPayload> type() {

@@ -6,7 +6,7 @@ namespace GorillaCraft
     /// </summary>
     public static class Proto
     {
-        public const int Version = 7;
+        public const int Version = 8;
         public const int MaxFrame = 64 << 20;
 
         // Gorilla Tag → Minecraft
@@ -23,6 +23,8 @@ namespace GorillaCraft
         public const byte GtPointer = 0x0B;
         public const byte GtScroll = 0x0C;
         public const byte GtShm = 0x0D;
+        public const byte GtModel = 0x0E;
+        public const byte GtBones = 0x0F;
 
         // Minecraft → Gorilla Tag
         public const byte McWelcome = 0x81;

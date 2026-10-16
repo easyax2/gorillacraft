@@ -125,6 +125,11 @@ static class Program
         SendPose(true, oldId, 0.5, -58.3, 0.5); // stale: must be ignored
         Pump(200);
         for (int i = 0; i < 10; i++) { SendPose(true, teleport.Id, 10.5, -58.3, 10.5); Pump(50); }
+        // Real gorilla model (test only: GORILLACRAFT_TEST_MODEL = a mesh extracted from the local game,
+        // never shipped): sent like the plugin sends it, then posed in its rest pose for the screenshot.
+        string testModel = Environment.GetEnvironmentVariable("GORILLACRAFT_TEST_MODEL");
+        if (testModel != null)
+            link.Send(TestModel(testModel));
         // For the screenshot: eyes 2.5 blocks south of the head, looking north at the gorilla's back,
         // hands reaching forward (north) and out.
         for (int i = 0; i < 30; i++)
@@ -132,6 +137,14 @@ static class Program
             link.Send(new FrameWriter(Proto.GtPose).U8(1).I32(teleport.Id).F64(10.5).F64(-58.3).F64(10.5).F32(180).F32(10)
                 .F64(10.5).F64(-58.0).F64(13.0).F64(10.5).F64(-58.0).F64(13.0)
                 .F64(11.0).F64(-58.7).F64(10.1).F64(9.8).F64(-58.2).F64(10.0).I32(0x3366CC).Finish());
+            if (testModel != null)
+            {
+                // Rest pose, turned to face south (the camera), feet on the ground.
+                var bones = new FrameWriter(Proto.GtBones).F64(10.5).F64(-58.3).F64(10.5).I32(1);
+                foreach (float v in new float[] { -1, 0, 0, 0, 0, 1, 0, -0.876f, 0, 0, 1, 0 })
+                    bones.F32(v);
+                link.Send(bones.Finish());
+            }
             Pump(50);
         }
 
@@ -330,6 +343,32 @@ static class Program
         if (len < 1e-8) return false;
         double off = Math.Abs(((d[0] - a[0]) * n[0] + (d[1] - a[1]) * n[1] + (d[2] - a[2]) * n[2]) / len);
         return off < 0.02 * min + 0.03;
+    }
+
+    static byte[] TestModel(string path)
+    {
+        var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path)).RootElement;
+        var pos = doc.GetProperty("pos"); var nrm = doc.GetProperty("nrm"); var uv = doc.GetProperty("uv");
+        var w = new FrameWriter(Proto.GtModel).I32(pos.GetArrayLength());
+        for (int i = 0; i < pos.GetArrayLength(); i++)
+        {
+            foreach (var a in new[] { pos[i], nrm[i] })
+                w.F32(a[0].GetSingle()).F32(a[1].GetSingle()).F32(a[2].GetSingle());
+            w.F32(uv[i][0].GetSingle()).F32(uv[i][1].GetSingle());
+            w.U8(0).U8(0).U8(0).U8(0).F32(1).F32(0).F32(0).F32(0);
+        }
+        byte[] white = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAADklEQVR4nGP4DwUMMAYAj4IP8TylVlEAAAAASUVORK5CYII=");
+        var subs = doc.GetProperty("subs");
+        w.I32(subs.GetArrayLength());
+        for (int p = 0; p < subs.GetArrayLength(); p++)
+        {
+            w.I32(subs[p].GetArrayLength());
+            foreach (var idx in subs[p].EnumerateArray())
+                w.I32(idx.GetInt32());
+            w.U8(p == 0 ? 1 : 0).F32(0.15f).F32(0.15f).F32(0.15f).F32(1).F32(1).F32(0).F32(0).I32(white.Length).Bytes(white);
+        }
+        w.I32(1);
+        return w.Finish();
     }
 
     static void Check(bool ok, string what)

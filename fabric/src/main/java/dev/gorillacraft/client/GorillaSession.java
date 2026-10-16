@@ -67,6 +67,8 @@ public final class GorillaSession {
 	/** Hand positions (Minecraft coordinates) and the gorilla's colour, for the avatar others see. */
 	private Vec3 leftHand = Vec3.ZERO, rightHand = Vec3.ZERO;
 	private int gorillaColor = 0x202020;
+	/** Gorilla Tag's bone pose (GT_BONES), relative to the head, for the real gorilla model. */
+	private float[] bones = new float[0];
 	/** Which eye the next overlay frame is drawn for. */
 	private int nextEye = Proto.EYE_LEFT;
 	private float poseYaw, posePitch;
@@ -263,6 +265,18 @@ public final class GorillaSession {
 			case Proto.GT_LEAVE_WORLD -> menu.leave(mc);
 			case Proto.GT_INVENTORY -> toggleInventory(mc, m.u8() != 0);
 			case Proto.GT_POINTER -> pointer(mc, m.f32(), m.f32(), m.u8());
+			case Proto.GT_MODEL -> GorillaMeshes.readModel(m);
+			case Proto.GT_BONES -> {
+				Vec3 ref = new Vec3(m.f64(), m.f64(), m.f64());
+				float[] b = new float[m.i32() * 12];
+				for (int i = 0; i < b.length; i++) {
+					b[i] = m.f32();
+				}
+				bones = b;
+				if (mc.player != null) {
+					GorillaMeshes.setPose(mc.player.getUUID(), ref, gorillaColor, b);
+				}
+			}
 			case Proto.GT_SHM -> {
 				sharedActive = m.u8() != 0 && shared != null;
 				GorillaCraft.LOG.info(sharedActive ? "Gorilla Tag maps the shared frames: frames go through shared memory"
@@ -283,7 +297,8 @@ public final class GorillaSession {
 				|| !ClientPlayNetworking.canSend(dev.gorillacraft.GorillaPosePayload.TYPE)) {
 			return;
 		}
-		ClientPlayNetworking.send(new dev.gorillacraft.GorillaPosePayload(new Vec3(poseX, poseY, poseZ), poseYaw, posePitch, leftHand, rightHand, gorillaColor));
+		ClientPlayNetworking.send(new dev.gorillacraft.GorillaPosePayload(new Vec3(poseX, poseY, poseZ), poseYaw, posePitch, leftHand, rightHand,
+				gorillaColor, bones));
 	}
 
 	/** The shared frame memory, once Gorilla Tag has confirmed it can read it; else null (use the socket). */

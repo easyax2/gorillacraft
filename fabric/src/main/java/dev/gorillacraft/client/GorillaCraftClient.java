@@ -25,5 +25,9 @@ public class GorillaCraftClient implements ClientModInitializer {
 		ClientTickEvents.END_CLIENT_TICK.register(session::tick);
 		AutoWorld autoWorld = new AutoWorld();
 		ClientTickEvents.END_CLIENT_TICK.register(autoWorld::tick);
+		// Other gorillas as Gorilla Tag's real model.
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(dev.gorillacraft.GorillaBonesPayload.TYPE,
+				(payload, context) -> GorillaMeshes.setPose(payload.owner(), payload.ref(), payload.color(), payload.bones()));
+		net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.COLLECT_SUBMITS.register(GorillaMeshes::render);
 	}
 }

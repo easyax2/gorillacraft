@@ -20,7 +20,7 @@ namespace GorillaCraft
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.8.0";
+        public const string Version = "0.9.0";
 
         internal static ManualLogSource Log;
 
@@ -55,6 +55,8 @@ namespace GorillaCraft
         private OverlayView overlay;
         private readonly GorillaOnlyView gorillaOnly = new GorillaOnlyView();
         private InventoryPanel inventory;
+        private bool modelSent;
+        private float nextModelTry;
         private SharedFrames shared;
         private HeldItemView held;
         private ConfigEntry<bool> swapEyes;
@@ -238,6 +240,36 @@ namespace GorillaCraft
                 }
             }
             return headCamera;
+        }
+
+        /// <summary>
+        /// Gorilla Tag's own gorilla for Minecraft: the model once (read from this game), then the
+        /// bone pose with every pose, so Minecraft can draw the real gorilla for everyone.
+        /// </summary>
+        private void SendGorilla(double headX, double headY, double headZ)
+        {
+            if (!modelSent && Time.time >= nextModelTry)
+            {
+                nextModelTry = Time.time + 5f;
+                try
+                {
+                    byte[] model = GorillaModel.Export(s => Log.LogInfo(s));
+                    if (model != null)
+                    {
+                        link.Send(model);
+                        modelSent = true;
+                    }
+                }
+                catch (System.Exception e)
+                {
+                    Log.LogWarning("Couldn't read the gorilla model: " + e);
+                }
+            }
+            if (!modelSent || !inMap)
+                return;
+            byte[] pose = GorillaModel.Pose(world.Coords, headX, headY, headZ);
+            if (pose != null)
+                link.Send(pose);
         }
 
         /// <summary>Your gorilla's colour as 0xRRGGBB.</summary>
@@ -447,6 +479,7 @@ namespace GorillaCraft
                     sentInMap = !inMap; // force a pose message with the current state
                     break;
                 case LinkClient.DisconnectedEvent _:
+                    modelSent = false;
                     shared?.Dispose();
                     shared = null;
                     wrist.SetConnected(false);
@@ -669,6 +702,7 @@ namespace GorillaCraft
             // Hands and colour, for the gorilla Minecraft shows everyone else.
             world.Coords.ToMinecraft(player.GetHandFollower(true).position, out double hlx, out double hly, out double hlz);
             world.Coords.ToMinecraft(player.GetHandFollower(false).position, out double hrx, out double hry, out double hrz);
+            SendGorilla(x, y, z);
             link.Send(new FrameWriter(Proto.GtPose).U8(inMap ? 1 : 0).I32(teleportAck)
                 .F64(x).F64(y).F64(z).F32(yaw).F32(pitch)
                 .F64(lx).F64(ly).F64(lz).F64(rx).F64(ry).F64(rz)

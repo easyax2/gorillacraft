@@ -21,6 +21,7 @@ namespace GorillaCraft
         public FrameWriter I32(int v) { w.Write(v); return this; }
         public FrameWriter F32(float v) { w.Write(v); return this; }
         public FrameWriter F64(double v) { w.Write(v); return this; }
+        public FrameWriter Bytes(byte[] b) { w.Write(b); return this; }
 
         public FrameWriter Str(string s)
         {

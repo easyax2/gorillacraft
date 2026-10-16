@@ -21,6 +21,7 @@ public class GorillaCraft implements ModInitializer {
 	public void onInitialize() {
 		PayloadTypeRegistry.serverboundPlay().register(GorillaPresencePayload.TYPE, GorillaPresencePayload.CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(GorillaPosePayload.TYPE, GorillaPosePayload.CODEC);
+		PayloadTypeRegistry.clientboundPlay().register(GorillaBonesPayload.TYPE, GorillaBonesPayload.CODEC);
 		ServerPlayNetworking.registerGlobalReceiver(GorillaPresencePayload.TYPE, (payload, context) -> {
 			GorillaPlayers.set(context.player().getUUID(), payload.active());
 			if (!payload.active()) {
@@ -28,7 +29,18 @@ public class GorillaCraft implements ModInitializer {
 				context.player().setInvisible(false);
 			}
 		});
-		ServerPlayNetworking.registerGlobalReceiver(GorillaPosePayload.TYPE, (payload, context) -> GorillaAvatars.update(context.player(), payload));
+		ServerPlayNetworking.registerGlobalReceiver(GorillaPosePayload.TYPE, (payload, context) -> {
+			GorillaAvatars.update(context.player(), payload);
+			// The real Gorilla Tag gorilla for everyone else with GorillaCraft.
+			if (payload.bones().length > 0 && GorillaPlayers.isGorilla(context.player().getUUID())) {
+				var bones = new GorillaBonesPayload(context.player().getUUID(), payload.head(), payload.color(), payload.bones());
+				for (var other : context.player().level().players()) {
+					if (other != context.player() && ServerPlayNetworking.canSend(other, GorillaBonesPayload.TYPE)) {
+						ServerPlayNetworking.send(other, bones);
+					}
+				}
+			}
+		});
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
 			GorillaPlayers.set(handler.player.getUUID(), false);
 			GorillaAvatars.remove(handler.player.getUUID());

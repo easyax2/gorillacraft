@@ -36,8 +36,10 @@ abstract class EntityRenderDispatcherMixin {
 					UUID owner = UUID.fromString(name.substring(GorillaAvatars.NAME_PREFIX.length()));
 					gorillacraft$gorillas.add(owner);
 					var me = Minecraft.getInstance().player;
-					if (me != null && me.getUUID().equals(owner) && System.getenv("GORILLACRAFT_SHOW_OWN_AVATAR") == null) {
-						cir.setReturnValue(false);
+					boolean mine = me != null && me.getUUID().equals(owner);
+					if (mine && System.getenv("GORILLACRAFT_SHOW_OWN_AVATAR") == null
+							|| dev.gorillacraft.client.GorillaMeshes.drawsReal(owner)) {
+						cir.setReturnValue(false); // yours, or drawn here as the real Gorilla Tag gorilla
 					}
 				} catch (IllegalArgumentException ignored) {
 				}

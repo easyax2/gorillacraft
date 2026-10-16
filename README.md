@@ -41,10 +41,12 @@ Tag features aren't in yet. This is interactions and maps only.
   on a panel you point at and click with your right hand.
 - **Live changes:** anything that changes in Minecraft (you, other players, redstone, water,
   explosions) updates in Gorilla Tag.
-- **Gorillas in Minecraft:** every GorillaCraft player is a gorilla in the Minecraft world, posed
-  from their real head and hands, in their Gorilla Tag colour, holding their held item. It's made
-  of Minecraft display entities, so **everyone** on the server sees it, even players without the
-  mod; the player's normal model is hidden. In VR you see other gorillas in Minecraft's picture,
+- **Gorillas in Minecraft:** every GorillaCraft player is a gorilla in the Minecraft world.
+  Players with GorillaCraft see **Gorilla Tag's real gorilla**: the model and textures are read
+  from their own installed Gorilla Tag at runtime (nothing from the game is shipped), and it moves
+  with Gorilla Tag's own bones (arm IK and all), relayed by the server. Players without the mod
+  see a block-built gorilla instead (display entities), posed from head and hands, in the
+  Gorilla Tag colour, holding the held item. The player's normal model is hidden. In VR you see other gorillas in Minecraft's picture,
   while your own hands stay Gorilla Tag's (no delay).
 
   ![A gorilla in Minecraft](docs/gorilla-avatar.png)

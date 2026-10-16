@@ -32,6 +32,12 @@ public final class Inbound {
 		return buf.getDouble();
 	}
 
+	public byte[] bytes(int n) {
+		byte[] b = new byte[n];
+		buf.get(b);
+		return b;
+	}
+
 	public String str() {
 		int len = buf.getShort() & 0xFFFF;
 		byte[] b = new byte[len];
