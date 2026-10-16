@@ -33,8 +33,17 @@ namespace GorillaCraft
             KeepXrOff(harmony);
             harmony.Patch(AccessTools.Method(typeof(ControllerInputPoller), "LateUpdate"),
                 prefix: new HarmonyMethod(typeof(MinecraftVr), nameof(PollerPrefix)));
+            // Before physics and before locomotion: the head and hands must be where Minecraft says
+            // at every point Gorilla Tag looks at them (its anti-teleport check pushes the body back
+            // whenever the head jumps between FixedUpdate and LateUpdate).
             harmony.Patch(AccessTools.Method(typeof(GTPlayer), "LateUpdate"),
                 prefix: new HarmonyMethod(typeof(MinecraftVr), nameof(ApplyPrefix)));
+            harmony.Patch(AccessTools.Method(typeof(GTPlayer), "FixedUpdate"),
+                prefix: new HarmonyMethod(typeof(MinecraftVr), nameof(ApplyPrefix)));
+            // Its "controller put down → follow the head with that hand" check: Minecraft says
+            // which hands are tracked, so both hands always count.
+            harmony.Patch(AccessTools.Method(AccessTools.TypeByName("ConnectedControllerHandler"), "SliceUpdate"),
+                prefix: new HarmonyMethod(typeof(MinecraftVr), nameof(ControllersAlwaysValid)));
             QualitySettings.vSyncCount = 0;
             Application.targetFrameRate = 144;
             AudioListener.volume = 0f; // Minecraft makes the sound
@@ -84,6 +93,17 @@ namespace GorillaCraft
 
         private static bool Skip() => false;
 
+        private static bool ControllersAlwaysValid(object __instance)
+        {
+            var overridden = Traverse.Create(__instance).Field("overriddenControllers");
+            if (System.Convert.ToInt32(overridden.GetValue()) != 0)
+            {
+                overridden.SetValue(System.Enum.ToObject(overridden.GetValueType(), 0));
+                Plugin.Log.LogInfo("Both hands count as held again");
+            }
+            return false;
+        }
+
         private static bool SkipCoroutine(ref IEnumerator __result)
         {
             __result = Enumerable.Empty<object>().GetEnumerator();
@@ -114,8 +134,15 @@ namespace GorillaCraft
             return head != null ? head.parent : null;
         }
 
-        /// <summary>Before Gorilla Tag's locomotion: head and hands where Minecraft says they are.</summary>
-        private static void ApplyPrefix()
+        private static void ApplyPrefix() => Apply();
+
+        private static float nextDriverCheck;
+
+        /// <summary>
+        /// Head and hands where Minecraft says they are. Called before Gorilla Tag's physics, at the
+        /// start of each frame and before its locomotion.
+        /// </summary>
+        public static void Apply()
         {
             Messages.Tracking t = tracking;
             GTPlayer p = GTPlayer.Instance;
@@ -126,6 +153,19 @@ namespace GorillaCraft
             {
                 loggedRig = true;
                 Plugin.Log.LogInfo($"Head {Path(head)}, rig {Path(rig)}, hands {Path(p.GetControllerTransform(true))} / {Path(p.GetControllerTransform(false))}");
+                // The hands come in SteamVR's controller pose: use Gorilla Tag's own SteamVR hand
+                // offsets (it only sets them itself when SteamVR is its XR device).
+                Quaternion r1 = Quaternion.Euler(-90f, 180f, -20f), r2 = Quaternion.Euler(-90f, 180f, 20f);
+                Quaternion q1 = Quaternion.Euler(-141f, 204f, -27f), q2 = Quaternion.Euler(-141f, 156f, 27f);
+                p.SetHandOffsets(true, new Vector3(-0.02f, 0f, -0.07f), q1 * Quaternion.Inverse(r1));
+                p.SetHandOffsets(false, new Vector3(0.02f, 0f, -0.07f), q2 * Quaternion.Inverse(r2));
+            }
+            if (Time.unscaledTime >= nextDriverCheck)
+            {
+                nextDriverCheck = Time.unscaledTime + 1f;
+                StopTrackingDrivers(head);
+                StopTrackingDrivers(p.GetControllerTransform(true));
+                StopTrackingDrivers(p.GetControllerTransform(false));
             }
             head.localPosition = Pos(t.Head);
             head.localRotation = Rot(t.Head);
@@ -133,6 +173,53 @@ namespace GorillaCraft
                 Place(p.GetControllerTransform(true), rig, t.Left);
             if (t.RightValid)
                 Place(p.GetControllerTransform(false), rig, t.Right);
+        }
+
+        private static readonly HashSet<Behaviour> stopped = new HashSet<Behaviour>();
+
+        /// <summary>
+        /// Unity's XR components that move the head and hands from XR devices: with no XR they'd
+        /// put them back at the origin between our updates. Gorilla Tag re-enables its controller
+        /// components now and then, so this runs every second.
+        /// </summary>
+        private static void StopTrackingDrivers(Transform t)
+        {
+            if (t == null)
+                return;
+            foreach (Behaviour b in t.GetComponents<Behaviour>())
+            {
+                if (b == null || !b.enabled)
+                    continue;
+                string n = b.GetType().FullName ?? "";
+                if (n.Contains("TrackedPoseDriver") || n.EndsWith("XRController") || n.Contains("ActionBasedController")
+                    || n.Contains("XRBaseController") || n.Contains("SteamVR_Behaviour_Pose") || n.Contains("SteamVR_TrackedObject"))
+                {
+                    b.enabled = false;
+                    if (stopped.Add(b))
+                        Plugin.Log.LogInfo($"Stopped {n} on {t.name}");
+                }
+            }
+        }
+
+        private static string HandsValid()
+        {
+            var t = Traverse.Create(AccessTools.TypeByName("ConnectedControllerHandler")).Property("Instance");
+            object h = t.GetValue();
+            if (h == null)
+                return "?";
+            return Traverse.Create(h).Property("LeftValid").GetValue() + "/" + Traverse.Create(h).Property("RightValid").GetValue();
+        }
+
+        /// <summary>For the log: what the gorilla's body is doing.</summary>
+        public static string Diagnostics()
+        {
+            GTPlayer p = GTPlayer.Instance;
+            Transform head = Head();
+            if (p == null || head == null)
+                return "no player";
+            var rb = p.playerRigidBody;
+            return $"head {head.position} local {head.localPosition}, L {p.GetControllerTransform(true).position} R {p.GetControllerTransform(false).position}, " +
+                $"hands valid {HandsValid()}, body {rb.position} vel {rb.linearVelocity} kinematic {rb.isKinematic} disableMovement {p.disableMovement} frozen {Traverse.Create(p).Property("IsFrozen").GetValue()}, tracking {(tracking != null ? "yes" : "no")}";
         }
 
         private static void Place(Transform hand, Transform rig, float[] pose)
@@ -185,6 +272,14 @@ namespace GorillaCraft
             c.leftControllerPrimary2DAxis = new Vector2(t.StickX[0], t.StickY[0]);
             c.rightControllerPrimary2DAxis = new Vector2(t.StickX[1], t.StickY[1]);
             c.rightStickLRFloat = t.StickX[1];
+            // Device poses (tracking space): Gorilla Tag treats a controller whose position stops
+            // changing as put down, and then ignores that hand.
+            c.headPosition = Pos(t.Head);
+            c.headRotation = Rot(t.Head);
+            c.leftControllerPosition = Pos(t.Left);
+            c.leftControllerRotation = Rot(t.Left);
+            c.rightControllerPosition = Pos(t.Right);
+            c.rightControllerRotation = Rot(t.Right);
             c.RecalculateGrabState();
             try
             {

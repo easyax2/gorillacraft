@@ -24,7 +24,7 @@ namespace GorillaCraft
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.10.0";
+        public const string Version = "0.10.1";
 
         internal static ManualLogSource Log;
         private static Plugin instance;
@@ -55,6 +55,7 @@ namespace GorillaCraft
         private readonly Dictionary<(int, int, int), Messages.Section> pendingSections = new Dictionary<(int, int, int), Messages.Section>();
         private readonly List<(int, int, int)> applyOrder = new List<(int, int, int)>();
 
+        private float nextDiagnostics;
         private bool inMap;
         private bool sentInMap;
         private int teleportAck;
@@ -200,7 +201,13 @@ namespace GorillaCraft
 
             while (link.TryReceive(out object msg))
                 Handle(msg);
+            MinecraftVr.Apply();
             ApplySections();
+            if (Time.unscaledTime >= nextDiagnostics)
+            {
+                nextDiagnostics = Time.unscaledTime + 5f;
+                Log.LogInfo($"Gorilla: {MinecraftVr.Diagnostics()}, inMap {inMap} holding {holding}");
+            }
 
             bool allowed = ModsAllowedHere();
             if (inMap && !allowed)
