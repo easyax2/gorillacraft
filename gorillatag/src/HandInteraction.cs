@@ -85,15 +85,7 @@ namespace GorillaCraft
                 SendMine(false, mineTarget);
             }
 
-            // Using / placing, on the grip's press (the trigger's, in fist mode).
-            for (int h = 0; h < 2; h++)
-            {
-                XRNode node = h == 0 ? XRNode.LeftHand : XRNode.RightHand;
-                bool down = fistMode ? ControllerInputPoller.TriggerFloat(node) > 0.5f : ControllerInputPoller.GripFloat(node) > 0.6f;
-                if (down && !gripWasDown[h] && found[h])
-                    SendUse(targets[h]);
-                gripWasDown[h] = down;
-            }
+            // Using / placing is Minecraft's: its use button is the trigger, aimed with the right controller.
 
             // Hotbar.
             bool x = ControllerInputPoller.PrimaryButtonPress(XRNode.LeftHand);

@@ -35,5 +35,6 @@ public class GorillaCraftClient implements ClientModInitializer {
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(dev.gorillacraft.GorillaBonesPayload.TYPE,
 				(payload, context) -> GorillaMeshes.setPose(payload.owner(), payload.ref(), payload.color(), payload.bones()));
 		net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.COLLECT_SUBMITS.register(GorillaMeshes::render);
+		net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.COLLECT_SUBMITS.register(dev.gorillacraft.client.vr.VrHands::render);
 	}
 }

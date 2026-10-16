@@ -24,7 +24,7 @@ namespace GorillaCraft
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.10.2";
+        public const string Version = "0.10.3";
 
         internal static ManualLogSource Log;
         private static Plugin instance;
@@ -77,7 +77,7 @@ namespace GorillaCraft
             touchDistance = Config.Bind("Hands", "TouchDistance", 0.12f, "How close (in Gorilla Tag units) a hand must be to a block to punch or use it.");
             punchSpeed = Config.Bind("Hands", "PunchSpeed", 3.0f, "How fast (metres per second, straight into the block) a hand must hit it to count as a punch. Higher: you have to hit harder, and climbing never breaks blocks.");
             punchHold = Config.Bind("Hands", "PunchHold", 0.4f, "Seconds Minecraft keeps mining after each punch. Survival blocks that take longer need more punches.");
-            fistMode = Config.Bind("Hands", "FistMode", false, "Only punches with a fist (grip held) break blocks, so climbing never does. The trigger then uses/places instead of the grip.");
+            fistMode = Config.Bind("Hands", "FistMode", false, "Only punches with a fist (grip held) break blocks, so climbing never does.");
             sectionsPerFrame = Config.Bind("Performance", "SectionsPerFrame", 4, "How many 16x16x16 block sections to build per frame.");
             shaderName = Config.Bind("Rendering", "Shader", "Universal Render Pipeline/Particles/Unlit", "Shader for Minecraft's blocks (they're colliders; nothing is shown).");
             autoInstall = Config.Bind("Minecraft", "AutoInstall", true, "Create/update the GorillaCraft instance in Prism Launcher (Minecraft 26.3, Fabric, Fabric API, this mod) when Gorilla Tag starts.");

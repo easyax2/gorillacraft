@@ -93,6 +93,7 @@ public final class VrControls {
 				inv.setSelectedSlot(Math.floorMod(inv.getSelectedSlot() + (x > 0 ? 1 : -1), n));
 			}
 		}
+		VrHands.update(mc, in, screen);
 		prevSecondaryL = in.secondary_[0];
 		prevSecondaryR = in.secondary_[1];
 		prevMenu = in.menu_;

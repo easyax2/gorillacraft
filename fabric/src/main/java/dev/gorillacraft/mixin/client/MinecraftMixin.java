@@ -22,6 +22,12 @@ abstract class MinecraftMixin {
 		}
 	}
 
+	/** In VR the right controller is the crosshair. */
+	@Inject(method = "pick", at = @At("TAIL"))
+	private void gorillacraft$vrPick(float partialTicks, CallbackInfo ci) {
+		dev.gorillacraft.client.vr.VrHands.pick((Minecraft) (Object) this);
+	}
+
 	/** Quitting: end the VR session while Minecraft's OpenGL is still there. */
 	@Inject(method = "close", at = @At("HEAD"))
 	private void gorillacraft$vrClose(CallbackInfo ci) {
