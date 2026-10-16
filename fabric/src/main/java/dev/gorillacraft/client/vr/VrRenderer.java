@@ -146,6 +146,11 @@ public final class VrRenderer {
 		long t0 = System.nanoTime();
 		xr.beginFrame();
 		waitNanos += System.nanoTime() - t0;
+		// Gorilla Tag's newest rig and bones, straight after the wait: as fresh as they get.
+		var gorillaSession = dev.gorillacraft.client.GorillaCraftClient.session();
+		if (gorillaSession != null) {
+			gorillaSession.frame(mc);
+		}
 		// The headset sets the pace: vsync to the monitor would hold every frame back.
 		if (xr.sessionRunning()) {
 			mc.options.pauseOnLostFocus = false; // you're in the headset, not at the window

@@ -92,21 +92,33 @@ public final class GorillaSession {
 		return connection != 0 && inMap && mc.level != null && mc.level == worldSentFor && mc.player != null;
 	}
 
-	void tick(Minecraft mc) {
+	/**
+	 * Every frame (not just every tick): Gorilla Tag's messages. Its rig (where you are) and bones
+	 * (your arms) arrive at its frame rate; read at Minecraft's 20 ticks a second they'd move in
+	 * 50 ms steps behind your head.
+	 */
+	public void frame(Minecraft mc) {
 		int cid = link.connectionId();
 		if (cid != connection) {
 			onConnectionChanged(cid);
 		}
 		if (cid == 0) {
-			updatePresence(mc);
 			return;
 		}
-
 		Inbound msg;
 		while ((msg = link.poll()) != null) {
 			if (msg.connection == cid) {
 				handle(mc, msg);
 			}
+		}
+	}
+
+	void tick(Minecraft mc) {
+		frame(mc);
+		int cid = connection;
+		if (cid == 0) {
+			updatePresence(mc);
+			return;
 		}
 
 		ClientLevel level = mc.level;

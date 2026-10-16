@@ -18,7 +18,9 @@ abstract class MinecraftMixin {
 	private void gorillacraft$vrBegin(boolean advanceGameTime, CallbackInfo ci) {
 		VrRenderer vr = VrRenderer.get();
 		if (vr != null) {
-			vr.beginFrame((Minecraft) (Object) this);
+			vr.beginFrame((Minecraft) (Object) this); // reads Gorilla Tag's messages after the headset's frame wait
+		} else if (dev.gorillacraft.client.GorillaCraftClient.session() != null) {
+			dev.gorillacraft.client.GorillaCraftClient.session().frame((Minecraft) (Object) this);
 		}
 	}
 
