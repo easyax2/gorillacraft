@@ -45,6 +45,8 @@ static class Program
         var s = sections[(0, -4, 0)];
         Console.WriteLine($"section 0 -4 0: solid {s.Layers[0].VertexCount / 4} quads, cutout {s.Layers[1].VertexCount / 4}, translucent {s.Layers[2].VertexCount / 4}, collision {s.CollisionQuads}, shapes {s.Shapes.Count}");
         CheckSection(s);
+        // The water placed at 8 -61 8 (section-local y 3), for Gorilla Tag's swimming.
+        Check(s.Water.Any(w => w.X == 8 && w.Z == 8 && w.Bottom <= 3 && w.Top >= 3 && w.Height > 0), "water arrives as a swimmable run");
         WaitFor(() => sections.Count >= 20, 60, "20+ sections");
         Console.WriteLine($"{sections.Count} sections received, {sections.Values.Count(x => !x.IsEmpty)} non-empty");
 

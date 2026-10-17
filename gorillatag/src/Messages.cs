@@ -46,8 +46,16 @@ namespace GorillaCraft
             /// <summary>Outline boxes (block-local 0..1) of blocks a hand can reach, keyed by y&lt;&lt;8 | z&lt;&lt;4 | x.</summary>
             public Dictionary<int, Box[]> Shapes;
 
-            public bool IsEmpty => CollisionQuads == 0 && Shapes.Count == 0
+            /// <summary>Water columns (section-local): x, z, bottom y, top y (inclusive), surface height of the top block in 1/16.</summary>
+            public WaterRun[] Water = new WaterRun[0];
+
+            public bool IsEmpty => CollisionQuads == 0 && Shapes.Count == 0 && Water.Length == 0
                 && Layers[0].VertexCount == 0 && Layers[1].VertexCount == 0 && Layers[2].VertexCount == 0;
+        }
+
+        public struct WaterRun
+        {
+            public byte X, Z, Bottom, Top, Height;
         }
 
         public sealed class SectionRemove { public int X, Y, Z; }
@@ -179,6 +187,12 @@ namespace GorillaCraft
                 for (int b = 0; b < n; b++)
                     boxes[b] = new Box { MinX = r.F32(), MinY = r.F32(), MinZ = r.F32(), MaxX = r.F32(), MaxY = r.F32(), MaxZ = r.F32() };
                 s.Shapes[key] = boxes;
+            }
+            if (r.Remaining >= 4)
+            {
+                s.Water = new WaterRun[r.I32()];
+                for (int i = 0; i < s.Water.Length; i++)
+                    s.Water[i] = new WaterRun { X = r.U8(), Z = r.U8(), Bottom = r.U8(), Top = r.U8(), Height = r.U8() };
             }
             return s;
         }

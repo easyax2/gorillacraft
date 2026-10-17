@@ -245,7 +245,7 @@ namespace GorillaCraft
                 return "no player";
             var rb = p.playerRigidBody;
             return $"head {head.position} local {head.localPosition}, L {p.GetControllerTransform(true).position} R {p.GetControllerTransform(false).position}, " +
-                $"hands valid {HandsValid()}, body {rb.position} vel {rb.linearVelocity} kinematic {rb.isKinematic} disableMovement {p.disableMovement} frozen {Traverse.Create(p).Property("IsFrozen").GetValue()}, tracking {(tracking != null ? "yes" : "no")}";
+                $"hands valid {HandsValid()}, body {rb.position} vel {rb.linearVelocity} kinematic {rb.isKinematic} disableMovement {p.disableMovement} frozen {Traverse.Create(p).Property("IsFrozen").GetValue()}, in water {p.InWater} ({MinecraftWater.Built} water volumes), tracking {(tracking != null ? "yes" : "no")}";
         }
 
         private static void Place(Transform hand, Transform rig, float[] pose)

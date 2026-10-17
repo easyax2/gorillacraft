@@ -48,6 +48,8 @@ Tag.
 - **Room-scale breaking:** punch a block with your real hand (into it, faster than 3 m/s) and
   Minecraft mines it for a moment: creative breaks in one punch, survival takes several.
 - **Held item** in your right hand; other players hold theirs too.
+- **Swimming:** Minecraft's water is Gorilla Tag water: float, swim with arm strokes, jump out
+  at the surface, the Gorilla Tag way.
 - **Survival:** moving costs a little hunger (measured from how far the gorilla travels, every
   10 seconds: about 400 blocks per half drumstick). Hostile mobs see and attack gorillas.
   Spears' charge attack is always on: run at a mob with a spear and it hits as hard as you're

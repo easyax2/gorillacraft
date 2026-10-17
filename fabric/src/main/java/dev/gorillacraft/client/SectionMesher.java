@@ -78,6 +78,7 @@ public final class SectionMesher {
 			}
 			w.i32(0); // collision quads
 			w.i32(0); // shape entries
+			w.i32(0); // water runs
 			return w.finish();
 		}
 
@@ -95,6 +96,8 @@ public final class SectionMesher {
 		BlockPos.MutableBlockPos npos = new BlockPos.MutableBlockPos();
 		int shapeCount = 0;
 		FrameWriter shapes = new FrameWriter(0, 1 << 12); // scratch: only its body is copied out
+		// Water, per block: its surface height in 1/16 (0 = no water), for Gorilla Tag's swimming.
+		byte[] water = new byte[4096];
 
 		BlockModelLighter.enableCaching();
 		try {
@@ -108,6 +111,9 @@ public final class SectionMesher {
 						pos.set(ox + lx, oy + ly, oz + lz);
 
 						FluidState fluid = state.getFluidState();
+						if (fluid.is(net.minecraft.tags.FluidTags.WATER)) {
+							water[ly << 8 | lz << 4 | lx] = (byte) Math.clamp(Math.round(fluid.getHeight(level, pos) * 16), 1, 16);
+						}
 						if (renderQuads && !fluid.isEmpty()) {
 							fluidRenderer.tesselate(level, pos, fluidOut, state, fluid);
 							fluidCapture.flush();
@@ -140,7 +146,40 @@ public final class SectionMesher {
 		byte[] shapeFrame = shapes.finish();
 		// Skip the scratch frame's own [u32 length][u8 type] header.
 		w.bytes(java.util.Arrays.copyOfRange(shapeFrame, 5, shapeFrame.length));
+		writeWater(w, water);
 		return w.finish();
+	}
+
+	/**
+	 * Water as vertical runs per column: u8 x, u8 z, u8 bottom y, u8 top y (inclusive, section
+	 * local), u8 surface height of the top block in 1/16 (Minecraft reports 16 when there's water
+	 * above it, also across the section border).
+	 */
+	private static void writeWater(FrameWriter w, byte[] water) {
+		FrameWriter runs = new FrameWriter(0, 1 << 10);
+		int count = 0;
+		for (int lz = 0; lz < 16; lz++) {
+			for (int lx = 0; lx < 16; lx++) {
+				int y = 0;
+				while (y < 16) {
+					if (water[y << 8 | lz << 4 | lx] == 0) {
+						y++;
+						continue;
+					}
+					int y0 = y;
+					while (y < 16 && water[y << 8 | lz << 4 | lx] != 0) {
+						y++;
+					}
+					int top = y - 1;
+					int height = water[top << 8 | lz << 4 | lx];
+					runs.u8(lx).u8(lz).u8(y0).u8(top).u8(height);
+					count++;
+				}
+			}
+		}
+		w.i32(count);
+		byte[] f = runs.finish();
+		w.bytes(java.util.Arrays.copyOfRange(f, 5, f.length));
 	}
 
 	private static int layerIndex(ChunkSectionLayer layer) {

@@ -174,6 +174,8 @@ namespace GorillaCraft
                 var mc = go.AddComponent<MeshCollider>();
                 mc.sharedMesh = view.Collision;
             }
+            if (s.Water.Length > 0)
+                MinecraftWater.Build(go, s.Water);
         }
 
         private Mesh BuildRenderMesh(Messages.Section s, out Material[] used)

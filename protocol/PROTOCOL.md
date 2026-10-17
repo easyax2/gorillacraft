@@ -44,6 +44,9 @@ Faces use Minecraft's `Direction` 3D data value: 0 down, 1 up, 2 north, 3 south,
 
 ### SECTION
 
+After the shapes: `i32 n`, n × `u8 x, u8 z, u8 bottomY, u8 topY (inclusive), u8 surfaceHeight (1/16)`: water as vertical runs per column (section-local), which Gorilla Tag turns into swimmable water volumes.
+
+
 ```
 i32 sx, sy, sz                      section coordinates (blocks = 16 × these)
 3 × layer (solid, cutout, translucent):
