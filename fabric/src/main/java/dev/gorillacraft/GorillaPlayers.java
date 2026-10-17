@@ -11,6 +11,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class GorillaPlayers {
 	private static final Set<UUID> GORILLAS = ConcurrentHashMap.newKeySet();
 
+	/** A gorilla's player box: about the gorilla's head and chest, eyes near the top. */
+	public static final net.minecraft.world.entity.EntityDimensions DIMENSIONS =
+			net.minecraft.world.entity.EntityDimensions.scalable(0.5f, 0.9f).withEyeHeight(0.75f);
+
 	private GorillaPlayers() {
 	}
 

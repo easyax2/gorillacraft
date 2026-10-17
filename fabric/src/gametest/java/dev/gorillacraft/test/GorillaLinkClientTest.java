@@ -75,6 +75,16 @@ public class GorillaLinkClientTest implements FabricClientGameTest {
 			if (inWall) {
 				throw new AssertionError("a gorilla with its eyes in a block counts as in a wall (suffocates)");
 			}
+			// Nor does lava below it reach it (a normal player box hangs 1.6 blocks below the eyes).
+			server.runCommand("setblock 10 -60 10 lava");
+			context.waitTicks(3);
+			boolean inLava = server.computeOnServer(s -> s.getPlayerList().getPlayers().getFirst().isInLava());
+			double boxHeight = server.computeOnServer(s -> (double) s.getPlayerList().getPlayers().getFirst().getBbHeight());
+			server.runCommand("setblock 10 -60 10 air");
+			System.out.println("GORILLACRAFT TEST lava below: inLava=" + inLava + " box height=" + boxHeight);
+			if (inLava || boxHeight > 1.0) {
+				throw new AssertionError("a gorilla's player box reaches the lava below it");
+			}
 			if (Math.abs(pos[0] - 10.5) > 0.05 || Math.abs(pos[1] - (-58.3)) > 0.05 || Math.abs(pos[2] - 10.5) > 0.05) {
 				throw new AssertionError("player isn't where the gorilla's head is");
 			}

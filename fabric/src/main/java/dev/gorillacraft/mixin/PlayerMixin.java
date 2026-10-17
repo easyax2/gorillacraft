@@ -18,7 +18,12 @@ abstract class PlayerMixin {
 	@Inject(method = "tick", at = @At("TAIL"))
 	private void gorillacraft$gorillaPhysics(CallbackInfo ci) {
 		Entity self = (Entity) (Object) this;
-		if (GorillaPlayers.isGorilla(self.getUUID())) {
+		boolean gorilla = GorillaPlayers.isGorilla(self.getUUID());
+		// Gorilla-sized box (AvatarMixin) while a gorilla, the normal one otherwise.
+		if (gorilla != (self.getBbHeight() == GorillaPlayers.DIMENSIONS.height())) {
+			self.refreshDimensions();
+		}
+		if (gorilla) {
 			self.noPhysics = true;
 			self.resetFallDistance();
 			// Others see a gorilla (GorillaAvatars), not this player's own model.
