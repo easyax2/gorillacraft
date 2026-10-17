@@ -146,18 +146,21 @@ public final class SectionMesher {
 		byte[] shapeFrame = shapes.finish();
 		// Skip the scratch frame's own [u32 length][u8 type] header.
 		w.bytes(java.util.Arrays.copyOfRange(shapeFrame, 5, shapeFrame.length));
-		writeWater(w, water);
+		writeWater(w, water, level, ox, oy, oz);
 		return w.finish();
 	}
 
 	/**
 	 * Water as vertical runs per column: u8 x, u8 z, u8 bottom y, u8 top y (inclusive, section
-	 * local), u8 surface height of the top block in 1/16 (Minecraft reports 16 when there's water
-	 * above it, also across the section border).
+	 * local), u16 the water's real surface in 1/16 block above the section's bottom. Where the
+	 * water carries on into the section above, the surface is found by walking up the column,
+	 * so deep water split across sections has one surface (Gorilla Tag's buoyancy depends on
+	 * the depth below it).
 	 */
-	private static void writeWater(FrameWriter w, byte[] water) {
+	private static void writeWater(FrameWriter w, byte[] water, ClientLevel level, int ox, int oy, int oz) {
 		FrameWriter runs = new FrameWriter(0, 1 << 10);
 		int count = 0;
+		BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
 		for (int lz = 0; lz < 16; lz++) {
 			for (int lx = 0; lx < 16; lx++) {
 				int y = 0;
@@ -171,8 +174,18 @@ public final class SectionMesher {
 						y++;
 					}
 					int top = y - 1;
-					int height = water[top << 8 | lz << 4 | lx];
-					runs.u8(lx).u8(lz).u8(y0).u8(top).u8(height);
+					int surface = top * 16 + water[top << 8 | lz << 4 | lx];
+					if (y == 16) {
+						// Up through the sections above (at most 256 blocks).
+						int wy = oy + 16;
+						p.set(ox + lx, wy, oz + lz);
+						FluidState f;
+						while (wy < oy + 16 + 256 && (f = level.getFluidState(p)).is(net.minecraft.tags.FluidTags.WATER)) {
+							surface = (wy - oy) * 16 + Math.clamp(Math.round(f.getHeight(level, p) * 16), 1, 16);
+							p.setY(++wy);
+						}
+					}
+					runs.u8(lx).u8(lz).u8(y0).u8(top).u16(Math.min(surface, 0xFFFF));
 					count++;
 				}
 			}
