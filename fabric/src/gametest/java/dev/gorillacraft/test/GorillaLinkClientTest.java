@@ -65,6 +65,16 @@ public class GorillaLinkClientTest implements FabricClientGameTest {
 			if (!lever.is(Blocks.LEVER) || !lever.getValue(LeverBlock.POWERED)) {
 				throw new AssertionError("lever wasn't flipped: " + lever);
 			}
+			// A gorilla never suffocates: its player box is wider than the gorilla's head.
+			server.runCommand("setblock 10 -59 10 stone");
+			context.waitTicks(2);
+			boolean inWall = server.computeOnServer(s -> s.getPlayerList().getPlayers().getFirst().isInWall());
+			float health = server.computeOnServer(s -> s.getPlayerList().getPlayers().getFirst().getHealth());
+			server.runCommand("setblock 10 -59 10 air");
+			System.out.println("GORILLACRAFT TEST eyes in stone: inWall=" + inWall + " health=" + health);
+			if (inWall) {
+				throw new AssertionError("a gorilla with its eyes in a block counts as in a wall (suffocates)");
+			}
 			if (Math.abs(pos[0] - 10.5) > 0.05 || Math.abs(pos[1] - (-58.3)) > 0.05 || Math.abs(pos[2] - 10.5) > 0.05) {
 				throw new AssertionError("player isn't where the gorilla's head is");
 			}
