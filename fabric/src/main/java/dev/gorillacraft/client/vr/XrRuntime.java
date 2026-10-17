@@ -102,7 +102,7 @@ public final class XrRuntime {
 	private SharedLibrary egl;
 
 	private final Swapchain[] eyes = new Swapchain[2];
-	private Swapchain gui, hud, cursor;
+	private Swapchain gui, cursor;
 	private XrInput input;
 
 	private boolean frameBegun;
@@ -148,10 +148,6 @@ public final class XrRuntime {
 
 	public Swapchain gui() {
 		return gui;
-	}
-
-	public Swapchain hud() {
-		return hud;
 	}
 
 	public XrInput input() {
@@ -347,7 +343,6 @@ public final class XrRuntime {
 				int h = Math.min(v.maxImageRectHeight(), Math.max(64, Math.round(v.recommendedImageRectHeight() * resolutionScale)));
 				eyes[e] = createSwapchain(w, h, false);
 			}
-			hud = createSwapchain(640, 192, false);
 			cursor = createSwapchain(16, 16, true);
 			input = new XrInput(this);
 			input.create();
@@ -649,9 +644,8 @@ public final class XrRuntime {
 			eyes[e] = null;
 		}
 		destroySwapchain(gui);
-		destroySwapchain(hud);
 		destroySwapchain(cursor);
-		gui = hud = cursor = null;
+		gui = cursor = null;
 		if (space != null) {
 			xrDestroySpace(space);
 			space = null;

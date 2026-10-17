@@ -33,7 +33,7 @@ import org.joml.Vector3f;
  *    swapchain image.
  * 3. The GUI alone (screens, HUD) is drawn into Minecraft's normal target on a transparent
  *    background and becomes a panel floating in front of you while a screen is open, or the
- *    hotbar on the back of your left hand while playing.
+ *    whole HUD on the back of your left hand while playing.
  *
  * Where you are in Minecraft: {@link #trackingToWorld} maps the headset's tracking space to
  * Minecraft's world. While Gorilla Tag drives the gorilla it is Gorilla Tag's rig (the gorilla's
@@ -403,20 +403,12 @@ public final class VrRenderer {
 			xr.release(gui);
 			quads.addAll(controls.panelQuads(gui, (float) h / w));
 		} else if (!mc.gui.hud.isHidden()) {
-			// The hotbar (and hearts, food, XP above it): the bottom middle of the screen.
-			int scale = Math.max(1, mc.getWindow().getGuiScale());
-			int cw = Math.min(w, 200 * scale), ch = Math.min(h, 60 * scale);
-			int x0 = (w - cw) / 2;
-			XrRuntime.Swapchain hud = xr.hud();
-			int img = xr.acquire(hud);
-			GlBlit.clear(img);
-			// Keep the crop's shape inside the hud image (letterboxed).
-			float sx = (float) hud.width / cw, sy = (float) hud.height / ch, s = Math.min(sx, sy);
-			int dw = Math.round(cw * s), dh = Math.round(ch * s);
-			int dx = (hud.width - dw) / 2, dy = (hud.height - dh) / 2;
-			blit.blit(src, x0, 0, x0 + cw, ch, img, dx, dy, dx + dw, dy + dh, true);
-			xr.release(hud);
-			quads.add(controls.wristQuad(hud));
+			// The whole HUD (hotbar, hearts, food, XP, chat, effects...) on the back of your left hand.
+			XrRuntime.Swapchain gui = xr.guiSized(w, h);
+			int img = xr.acquire(gui);
+			blit.blit(src, 0, 0, w, h, img, 0, 0, w, h, false);
+			xr.release(gui);
+			quads.add(controls.wristQuad(gui));
 		}
 	}
 
