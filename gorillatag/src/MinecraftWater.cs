@@ -18,6 +18,30 @@ namespace GorillaCraft
         private static int waterLayer = -1;
         private static bool warned;
 
+        /// <summary>
+        /// Gorilla Tag's water plays ripples (and splashes, drips) whatever its parameters say, from
+        /// effect prefabs ours doesn't have: that throws, and the exception stops the water from
+        /// handling the rest of the gorilla that frame (no swimming). Skip effects without a prefab.
+        /// </summary>
+        public static void PatchEffects(Harmony harmony)
+        {
+            var t = typeof(WaterOverlappingCollider);
+            foreach (string name in new[] { "PlayRippleEffect", "PlaySplashEffect", "PlayDripEffect" })
+            {
+                var m = AccessTools.Method(t, name);
+                if (m != null)
+                    harmony.Patch(m, prefix: new HarmonyMethod(typeof(MinecraftWater), nameof(OnlyWithPrefab)));
+            }
+        }
+
+        private static bool OnlyWithPrefab(object[] __args)
+        {
+            if (__args.Length == 0)
+                return true;
+            var prefab = __args[0] as GameObject;
+            return prefab != null; // null (or destroyed): skip the effect
+        }
+
         private static int WaterLayer()
         {
             if (waterLayer >= 0)

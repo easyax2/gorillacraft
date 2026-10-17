@@ -70,6 +70,7 @@ namespace GorillaCraft
             // which hands are tracked, so both hands always count.
             harmony.Patch(AccessTools.Method(AccessTools.TypeByName("ConnectedControllerHandler"), "SliceUpdate"),
                 prefix: new HarmonyMethod(typeof(MinecraftVr), nameof(ControllersAlwaysValid)));
+            MinecraftWater.PatchEffects(harmony);
             QualitySettings.vSyncCount = 0;
             Application.targetFrameRate = 144;
             AudioListener.volume = 0f; // Minecraft makes the sound
