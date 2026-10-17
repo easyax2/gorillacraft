@@ -91,6 +91,7 @@ final class GorillaTagLauncher {
 				GorillaCraft.LOG.warn("Gorilla Tag.exe not found in your Steam libraries; starting it through Steam");
 				return false;
 			}
+			removeOpenVrPreInit(exe.resolveSibling("Gorilla Tag_Data").resolve("boot.config"));
 			Path appId = exe.resolveSibling("steam_appid.txt");
 			try {
 				if (!Files.exists(appId)) {
@@ -115,6 +116,32 @@ final class GorillaTagLauncher {
 		} catch (Exception e) {
 			GorillaCraft.LOG.warn("Couldn't start Gorilla Tag.exe directly ({}); starting it through Steam", e.toString());
 			return false;
+		}
+	}
+
+	/**
+	 * Gorilla Tag's boot.config starts OpenVR natively at launch (before its plugins run), which
+	 * makes SteamVR treat it as the VR app and close Minecraft. The plugin removes the line too
+	 * (keeping a backup it restores when GorillaCraft is turned off); doing it here as well means
+	 * even the first start is clean.
+	 */
+	private static void removeOpenVrPreInit(Path bootConfig) {
+		try {
+			if (!Files.exists(bootConfig)) {
+				return;
+			}
+			List<String> lines = new ArrayList<>(Files.readAllLines(bootConfig));
+			for (int i = 0; i < lines.size(); i++) {
+				if (lines.get(i).startsWith("xrsdk-pre-init-library=")) {
+					Files.writeString(bootConfig.resolveSibling("boot.config.gorillacraft"), lines.get(i));
+					lines.remove(i);
+					Files.write(bootConfig, lines);
+					GorillaCraft.LOG.info("Took OpenVR's early start out of Gorilla Tag's boot.config");
+					return;
+				}
+			}
+		} catch (Exception e) {
+			GorillaCraft.LOG.warn("Couldn't update Gorilla Tag's boot.config ({}): SteamVR may close Minecraft when Gorilla Tag starts", e.toString());
 		}
 	}
 

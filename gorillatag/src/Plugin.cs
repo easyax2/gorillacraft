@@ -24,7 +24,7 @@ namespace GorillaCraft
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.10.15";
+        public const string Version = "0.10.16";
 
         internal static ManualLogSource Log;
         private static Plugin instance;
@@ -93,6 +93,7 @@ namespace GorillaCraft
             startMinecraft = Config.Bind("Minecraft", "StartMinecraft", true,
                 "When you start Gorilla Tag yourself, start the GorillaCraft instance in Prism (Windows; on Linux use the Steam launch option from the guide).");
             startedByMinecraft = MinecraftVr.StartedByMinecraft();
+            BootConfig.Apply(startedByMinecraft || playInMinecraft.Value);
             if (!startedByMinecraft && !playInMinecraft.Value)
             {
                 Log.LogInfo("Gorilla Tag started normally and PlayInMinecraft is off: GorillaCraft stays out of the way.");
