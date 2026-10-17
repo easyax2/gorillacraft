@@ -58,7 +58,7 @@ Tag.
   chests, crafting) float in front of you. Point with the right hand, **trigger** clicks, **grip**
   right-clicks, right stick scrolls, **B** closes. **Y** opens the inventory, the **menu**
   button pauses, left stick click re-centres the panel.
-- **Hotbar** on your left wrist. **A**/**X** or left stick left/right change slots.
+- **Hotbar** on the back of your left hand. **A**/**X** or left stick left/right change slots.
 - **Gorillas in multiplayer:** every GorillaCraft player is a gorilla. Players with the mod see
   Gorilla Tag's real gorilla; players without it see a block-built gorilla (display entities) in
   the Gorilla Tag colour, holding the held item. Player models are hidden.

@@ -193,10 +193,14 @@ public final class VrControls {
 		return quads;
 	}
 
-	/** The hotbar on the back of your left wrist, tilted towards your eyes. */
+	/**
+	 * The hotbar on the back of your left hand. The left grip's +X points out of the back of the
+	 * hand, so the panel faces that way, a few centimetres out; it reads left to right across the
+	 * knuckles (towards the thumb, grip -Z) with its top towards the fingertips.
+	 */
 	XrRuntime.Quad wristQuad(XrRuntime.Swapchain hud) {
-		float width = 0.2f;
-		return new XrRuntime.Quad(hud, true, new Vector3f(0f, 0.05f, 0.12f), new Quaternionf().rotationX((float) Math.toRadians(-40)), width,
+		float width = 0.14f;
+		return new XrRuntime.Quad(hud, true, new Vector3f(0.055f, -0.01f, 0f), new Quaternionf().rotationY((float) Math.toRadians(90)), width,
 				width * hud.height / hud.width);
 	}
 }

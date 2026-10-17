@@ -33,7 +33,7 @@ import org.joml.Vector3f;
  *    swapchain image.
  * 3. The GUI alone (screens, HUD) is drawn into Minecraft's normal target on a transparent
  *    background and becomes a panel floating in front of you while a screen is open, or the
- *    hotbar on your left wrist while playing.
+ *    hotbar on the back of your left hand while playing.
  *
  * Where you are in Minecraft: {@link #trackingToWorld} maps the headset's tracking space to
  * Minecraft's world. While Gorilla Tag drives the gorilla it is Gorilla Tag's rig (the gorilla's
