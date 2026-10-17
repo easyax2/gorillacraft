@@ -81,16 +81,16 @@ Linux section too). Downloads are on the [releases page](https://github.com/easy
 ## Playing
 
 1. Start your VR runtime (WiVRn, SteamVR...) and put the headset on.
-2. Start the **GorillaCraft** instance in Prism. Minecraft opens in the headset and starts
-   Gorilla Tag by itself a few seconds later (a small window: leave it running).
+2. Start **Gorilla Tag** from Steam. With GorillaCraft it opens in a small window with VR off
+   (your gorilla's body) and starts the **GorillaCraft** instance in Prism, which opens in the
+   headset. (On Linux, Steam starts Prism through Gorilla Tag's launch options, see the guide.)
+   Starting the GorillaCraft instance first works too: Minecraft then starts Gorilla Tag. With
+   SteamVR, start Gorilla Tag first: SteamVR hands the headset to any game Steam starts.
 3. Minecraft opens a creative world called GorillaCraft (or pick one from the menu). As soon as
    Gorilla Tag is connected you're a gorilla: climb, punch, build.
 
-**If your Gorilla Tag launch options start Prism** (`prismlauncher --launch GorillaCraft & ...`
-from older versions), **remove that part**: now Minecraft starts Gorilla Tag, not the other way.
-
-GorillaCraft only drives the gorilla when Gorilla Tag was started by Minecraft. Started normally,
-Gorilla Tag is plain Gorilla Tag (the plugin just keeps the Prism instance up to date).
+To play normal Gorilla Tag in VR, set `PlayInMinecraft = false` in
+`BepInEx/config/dev.gorillacraft.cfg`.
 
 ## Configuration
 

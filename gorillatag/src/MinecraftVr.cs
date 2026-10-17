@@ -73,7 +73,7 @@ namespace GorillaCraft
             QualitySettings.vSyncCount = 0;
             Application.targetFrameRate = 144;
             AudioListener.volume = 0f; // Minecraft makes the sound
-            Plugin.Log.LogInfo("Started by Minecraft: no VR here, Minecraft's headset and controllers move the gorilla");
+            Plugin.Log.LogInfo("No VR here: Minecraft has the headset, and its headset and controllers move the gorilla");
         }
 
         /// <summary>Unity's XR (OpenVR → the headset) must not start: Minecraft has the headset.</summary>

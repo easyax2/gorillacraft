@@ -4,7 +4,7 @@ This guide takes you from a plain Gorilla Tag and Minecraft install to playing M
 as a Gorilla Tag gorilla. Each step says how to check that it worked before you move on. Linux
 players: follow the same steps, then read [section 14](#14-linux-proton-and-wivrn).
 
-> **Early release.** GorillaCraft 0.10.10 changes how everything works (Minecraft is now the VR
+> **Early release.** GorillaCraft 0.10.11 changes how everything works (Minecraft is now the VR
 > game). It has been tested against a real headset runtime and with a stand-in for Gorilla Tag,
 > but not yet played with the headset on. Hand positions, the menu panel and the wrist hotbar
 > may need tuning. Please report what you find.
@@ -55,7 +55,7 @@ headset on. Minecraft opens in the headset and starts Gorilla Tag by itself.
 | **Minecraft: Java Edition** | Owned on your Microsoft account. GorillaCraft uses version 26.3, and Prism downloads it for you. |
 | **[Prism Launcher](https://prismlauncher.org/download/windows/)** | Free Minecraft launcher. GorillaCraft sets up its own instance in it. |
 | **A reasonably strong PC** | Minecraft draws two eyes at headset resolution while Gorilla Tag runs alongside. Plan for 16 GB of RAM and a GPU that runs VR games comfortably. |
-| **From the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)** | `GorillaCraft.dll`, or `GorillaCraft-0.10.10-GorillaTag.zip` with the same dll already in its folders. The Minecraft mod is inside the dll; the separate `.jar` is for servers and manual installs. |
+| **From the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)** | `GorillaCraft.dll`, or `GorillaCraft-0.10.11-GorillaTag.zip` with the same dll already in its folders. The Minecraft mod is inside the dll; the separate `.jar` is for servers and manual installs. |
 
 **Utilla isn't needed.** GorillaCraft works alone (Gorilla Tag stays out of rooms while you play),
 in private rooms, and in modded lobbies. It switches itself off in public lobbies.
@@ -108,38 +108,50 @@ You don't need to create an instance or download any mods. GorillaCraft does tha
    Don't leave a second copy loose in `BepInEx\plugins`.
 3. If Windows marked the file as downloaded from the internet: right-click it →
    **Properties** → tick **Unblock** if it's there → **OK**.
-4. **Start Gorilla Tag once, normally** (from Steam), wait ten seconds in the forest, and quit.
-   This sets up Minecraft in Prism. Started normally, Gorilla Tag stays plain Gorilla Tag: the
-   plugin only does something when Minecraft starts it.
+4. **Start Gorilla Tag** from Steam. It opens in a window with VR off (with GorillaCraft it's
+   your gorilla's body), sets up Minecraft in Prism and starts it. The first start of Minecraft
+   downloads it, so give it a few minutes.
 
 **Check:** open `BepInEx\LogOutput.log` in Notepad. You should see:
 
 ```
-[Info   :   BepInEx] Loading [GorillaCraft 0.10.10]
-[Info   :GorillaCraft] Gorilla Tag started normally: GorillaCraft stays out of the way. ...
-[Info   :GorillaCraft] Prism instance in C:\Users\...\AppData\Roaming\PrismLauncher: created instance; ...; installed gorillacraft-fabric-0.10.10+26.3.jar; installed fabric-api-0.161.0+26.3.jar
+[Info   :   BepInEx] Loading [GorillaCraft 0.10.11]
+[Info   :GorillaCraft] Started first: Minecraft will be started and take the headset
+[Info   :GorillaCraft] Prism instance in C:\Users\...\AppData\Roaming\PrismLauncher: created instance; ...; installed gorillacraft-fabric-0.10.11+26.3.jar; installed fabric-api-0.161.0+26.3.jar
 ```
 
 Prism now has an instance called **GorillaCraft**: Minecraft 26.3, Fabric Loader 0.19.5, Fabric
-API and the GorillaCraft mod, set to open a creative world called **GorillaCraft** by itself.
+API and the GorillaCraft mod, set to open a survival world called **GorillaCraft** by itself.
 
-**If you used GorillaCraft before 0.10.10:** remove `prismlauncher --launch GorillaCraft &` from
-Gorilla Tag's Steam launch options (**Gorilla Tag → Properties → General → Launch Options**).
-Minecraft starts Gorilla Tag now, not the other way round.
+**Windows:** don't put `prismlauncher` in Gorilla Tag's Steam launch options: Gorilla Tag starts
+Minecraft by itself. (Linux is different, see section 14.)
 
 ## 6. Play
 
+**Start Gorilla Tag first** (recommended, and the way that works with SteamVR):
+
 1. **Start your VR runtime** (SteamVR, the Meta app with Link, Virtual Desktop...) and put on the
    headset.
-2. **Start the GorillaCraft instance** in Prism (double-click it). The first time, Prism downloads
-   Minecraft, Fabric and Java, which takes a few minutes.
-3. Minecraft appears **in your headset**. A few seconds later it starts Gorilla Tag through Steam.
-   Gorilla Tag opens in a small window on your monitor and stays silent. Leave it running: it's
-   your gorilla.
-4. Minecraft opens the GorillaCraft world. As soon as Gorilla Tag is connected (about half a
-   minute after it starts), you're a gorilla in the world: climb, punch and build.
+2. **Start Gorilla Tag from Steam** as usual. With GorillaCraft installed it doesn't open in VR: it
+   opens in a window with VR off (it's your gorilla's body now) and, a few seconds later, starts
+   the **GorillaCraft** instance in Prism. The first time, Prism downloads Minecraft, Fabric and
+   Java, which takes a few minutes.
+3. Minecraft appears **in your headset** and opens the GorillaCraft world. As soon as it's
+   connected to Gorilla Tag, you're a gorilla in the world: climb, punch and build. Leave
+   Gorilla Tag's window running.
 
-To start without the menus, you can also make a desktop shortcut:
+Why this order: when Steam starts a game while SteamVR is running, SteamVR hands the headset to
+that game and closes whatever VR app had it. Started first, Gorilla Tag gets that hand-over
+(and doesn't use it); Minecraft, started afterwards, keeps the headset.
+
+**Or start Minecraft first:** start the GorillaCraft instance in Prism and Minecraft starts
+Gorilla Tag itself. This works with WiVRn, Monado, Virtual Desktop and the Meta app, but SteamVR
+may take the headset away from Minecraft when Gorilla Tag starts; then use the order above.
+
+To play normal Gorilla Tag in VR again, set `PlayInMinecraft = false` in
+`BepInEx\config\dev.gorillacraft.cfg` (or remove the plugin).
+
+To start Minecraft without the menus, you can also make a desktop shortcut:
 
 ```
 "%LOCALAPPDATA%\Programs\PrismLauncher\prismlauncher.exe" --launch GorillaCraft
@@ -228,6 +240,8 @@ Open it with Notepad while Gorilla Tag is closed.
 | `[Hands] PunchHold` | `0.4` | Seconds Minecraft keeps mining after each punch. |
 | `[Hands] FistMode` | `false` | Only punches with grip held break blocks; the trigger places instead of the grip. |
 | `[Performance] SectionsPerFrame` | `4` | How many 16×16×16 chunks of blocks become colliders per frame. |
+| `[Minecraft] PlayInMinecraft` | `true` | Gorilla Tag is your gorilla for Minecraft whenever it starts (VR off in Gorilla Tag). `false`: only when Minecraft starts it; started yourself it's normal Gorilla Tag. |
+| `[Minecraft] StartMinecraft` | `true` | When you start Gorilla Tag yourself, start the GorillaCraft instance in Prism (Windows). |
 | `[Minecraft] AutoInstall` | `true` | Keep the GorillaCraft instance in Prism up to date when Gorilla Tag starts. |
 | `[Minecraft] PrismPath` / `PrismDataDir` | *(empty)* | Where Prism is, if it's not in a usual place (portable copies, other drives). |
 | `[Minecraft] World` | `GorillaCraft` | World Minecraft opens by itself (only used when the instance is first created). |
@@ -254,7 +268,7 @@ You need [Java 25](https://adoptium.net/) on the server PC.
 4. Open `eula.txt`, change `eula=false` to `eula=true`, save.
 5. Put **two jars** into the new `mods` folder:
    - **Fabric API** for 26.3, from [Modrinth](https://modrinth.com/mod/fabric-api)
-   - `gorillacraft-fabric-0.10.10+26.3.jar` from the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)
+   - `gorillacraft-fabric-0.10.11+26.3.jar` from the [GorillaCraft release](https://github.com/easyax2/gorillacraft/releases)
 6. Optional, in `server.properties`:
    - `gamemode=creative` (and `force-gamemode=true`) for building, or leave survival
    - `difficulty=peaceful` if you don't want mobs attacking gorillas
@@ -310,8 +324,8 @@ join `<that PC's IP>:<port shown in chat>` from Multiplayer.
 | Log says `VR needs Minecraft's OpenGL renderer` | Options → Video Settings → Graphics API: OpenGL (or Default), and restart. |
 | The runtime can't take OpenGL frames | Your runtime doesn't support OpenGL apps. SteamVR, Oculus, WiVRn and Monado do. |
 | Gorilla Tag doesn't start | Is Steam running? The Minecraft log says `Starting Gorilla Tag: ...`. Start it from Steam yourself: it still works, but only Gorilla Tag started by Minecraft drives the gorilla, so add `-gorillacraft` to its launch options for that. |
-| Minecraft leaves VR or closes a moment after Gorilla Tag starts (log: `VR session ended`) | SteamVR switched to Gorilla Tag because it was started through Steam. Since 0.10.10 Minecraft starts `Gorilla Tag.exe` directly (log: `Starting Gorilla Tag: ...Gorilla Tag.exe`). If it says `steam.exe -applaunch` instead, it couldn't find the game in your Steam libraries: report your Steam library folders. |
-| Gorilla Tag starts **in VR**, or a second Minecraft starts | Remove `prismlauncher --launch GorillaCraft &` from Gorilla Tag's launch options (older versions needed it). |
+| Minecraft leaves VR or closes a moment after Gorilla Tag starts (log: `VR session ended`) | SteamVR switched to Gorilla Tag because it was started through Steam. Since 0.10.11 Minecraft starts `Gorilla Tag.exe` directly (log: `Starting Gorilla Tag: ...Gorilla Tag.exe`). If it says `steam.exe -applaunch` instead, it couldn't find the game in your Steam libraries: report your Steam library folders. |
+| Gorilla Tag starts **in VR** | `PlayInMinecraft` is off in `dev.gorillacraft.cfg`, or the plugin isn't loaded (check `LogOutput.log`). |
 | You stand still and arms don't move | Gorilla Tag isn't connected yet (its window says so), or it was started without `-gorillacraft`. Its log should say `Started by Minecraft: no VR here`. |
 | Laggy or stuttering picture, but Minecraft's log says `VR: 85–90 fps` | It's the video stream to the headset, not the games. WiVRn's log (`~/.local/state/wivrn/wivrn-dashboard/server_logs_*.txt`) shows `IDR frame needed` each time the headset lost frames. Put the PC on Ethernet, use a 5 GHz (or 6 GHz) Wi-Fi network for the headset with nothing else busy on it, stay close to the router, and raise the bitrate/resolution in WiVRn's dashboard once it's stable. |
 | Hands are offset from your controllers | Report it with your headset model; hand offsets may need tuning per controller. |
@@ -371,22 +385,18 @@ The end-to-end test (`tools\linktest` with `gradlew runClientGameTest`) is descr
 GorillaCraft works on Linux with Minecraft native (Prism) and Gorilla Tag under Proton. Minecraft
 uses your OpenXR runtime directly: **WiVRn** (Quest) or **Monado**; SteamVR works too.
 
-1. Install BepInEx in Gorilla Tag as in section 3, and set Gorilla Tag's Steam launch option so
-   Proton loads it:
+1. Install BepInEx in Gorilla Tag as in section 3. Under Proton, Gorilla Tag can't start Linux
+   programs, so let Steam start Minecraft together with it. Gorilla Tag's Steam launch options:
    ```
-   WINEDLLOVERRIDES="winhttp=n,b" %command%
+   prismlauncher --launch GorillaCraft & WINEDLLOVERRIDES="winhttp=n,b" %command%
    ```
-   (Older GorillaCraft versions also had `prismlauncher --launch GorillaCraft &` at the front:
-   remove that.)
+   (Flatpak: `flatpak run org.prismlauncher.PrismLauncher --launch GorillaCraft &` instead.)
 2. Install Prism Launcher (native package or Flatpak) and sign in. Start Gorilla Tag once from
    Steam: the plugin finds Prism's folder in your home folder and creates the GorillaCraft
    instance, as on Windows.
-3. Start WiVRn (or your runtime) and connect the headset. Then start the **GorillaCraft** instance:
-   ```
-   prismlauncher --launch GorillaCraft
-   ```
-   Minecraft opens in the headset and runs `steam -applaunch 1533390 -gorillacraft ...` to start
-   Gorilla Tag (falling back to a `steam://` link).
+3. Start WiVRn (or your runtime) and connect the headset. Then start Gorilla Tag from Steam:
+   Minecraft starts with it and takes the headset. (Starting the GorillaCraft instance first
+   works too: Minecraft then starts Gorilla Tag with `steam -applaunch 1533390 -gorillacraft`.)
 
 Minecraft's window must use EGL for OpenXR on Linux: on Wayland it does already, on X11 GorillaCraft
 asks SDL for EGL by itself. The system OpenXR loader (`libopenxr_loader.so.1`, package `openxr`)

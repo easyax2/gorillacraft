@@ -24,7 +24,7 @@ namespace GorillaCraft
     {
         public const string Guid = "dev.gorillacraft";
         public const string Name = "GorillaCraft";
-        public const string Version = "0.10.10";
+        public const string Version = "0.10.11";
 
         internal static ManualLogSource Log;
         private static Plugin instance;
@@ -43,6 +43,9 @@ namespace GorillaCraft
         private ConfigEntry<string> prismPath;
         private ConfigEntry<string> prismDataDir;
         private ConfigEntry<string> worldName;
+        private ConfigEntry<bool> playInMinecraft;
+        private ConfigEntry<bool> startMinecraft;
+        private bool startedByMinecraft;
         private string lastStatus = "";
 
         private LinkClient link;
@@ -85,11 +88,17 @@ namespace GorillaCraft
             prismDataDir = Config.Bind("Minecraft", "PrismDataDir", "", "Prism's data folder (the one with instances in it). Empty: the default one.");
             worldName = Config.Bind("Minecraft", "World", "GorillaCraft", "Singleplayer world Minecraft opens by itself (created the first time). Only used when the instance is first created.");
 
-            if (!MinecraftVr.StartedByMinecraft())
+            playInMinecraft = Config.Bind("Minecraft", "PlayInMinecraft", true,
+                "Whenever Gorilla Tag starts, it's your gorilla for Minecraft: no VR here, Minecraft has the headset. false: only when Minecraft started Gorilla Tag; started yourself, it's normal Gorilla Tag.");
+            startMinecraft = Config.Bind("Minecraft", "StartMinecraft", true,
+                "When you start Gorilla Tag yourself, start the GorillaCraft instance in Prism (Windows; on Linux use the Steam launch option from the guide).");
+            startedByMinecraft = MinecraftVr.StartedByMinecraft();
+            if (!startedByMinecraft && !playInMinecraft.Value)
             {
-                Log.LogInfo("Gorilla Tag started normally: GorillaCraft stays out of the way. To play, start the GorillaCraft instance in Prism; it starts Gorilla Tag itself.");
+                Log.LogInfo("Gorilla Tag started normally and PlayInMinecraft is off: GorillaCraft stays out of the way.");
                 return;
             }
+            Log.LogInfo(startedByMinecraft ? "Started by Minecraft" : "Started first: Minecraft will be started and take the headset");
             var vrHarmony = new Harmony(Guid);
             MinecraftVr.StayOutOfSteamLaunch(vrHarmony);
             MinecraftVr.Enable(vrHarmony);
@@ -148,16 +157,31 @@ namespace GorillaCraft
             if (installChecked || Time.realtimeSinceStartup < 5f)
                 return;
             installChecked = true;
-            if (!autoInstall.Value)
-                return;
             try
             {
                 string exe = PrismSetup.IsWine() ? null : PrismSetup.FindExecutable(prismPath.Value);
                 string data = PrismSetup.FindDataDir(prismDataDir.Value, exe);
-                if (data == null)
+                if (!autoInstall.Value)
+                {
+                }
+                else if (data == null)
                     Log.LogInfo("Prism Launcher not found; not installing the Minecraft mod");
                 else
                     Log.LogInfo($"Prism instance in {data}: {PrismSetup.Install(data, worldName.Value)}");
+                // Gorilla Tag first: Steam's hand-over of the headset to a game it launches has
+                // happened already, so Minecraft (started now) keeps the headset.
+                if (MinecraftVr.Active && !startedByMinecraft && startMinecraft.Value && link != null && !link.Connected)
+                {
+                    if (PrismSetup.IsWine())
+                        SetStatus("Start the GorillaCraft instance in Prism (or add it to Gorilla Tag's Steam launch options, see the guide)");
+                    else if (exe == null)
+                        SetStatus("prismlauncher.exe not found: set PrismPath in dev.gorillacraft.cfg, or start the GorillaCraft instance yourself");
+                    else
+                    {
+                        PrismSetup.Launch(exe, prismDataDir.Value);
+                        SetStatus("Starting Minecraft (the GorillaCraft instance in Prism)...");
+                    }
+                }
             }
             catch (System.Exception e)
             {
